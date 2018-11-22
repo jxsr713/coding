@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 import time
 import sys
 import os
+import re
 
 # https://www.crummy.com/software/BeautifulSoup/bs4/doc/index.zh.html#find
 # https://www.jianshu.com/p/520749be7377
@@ -37,22 +38,62 @@ d>N/A</td><td>N/A</td><td>Jericho+</td><td>BifrostCPU</td><td>BFST</td><td>2</td
 <td>N</td><td>1</td><td>6</td><td>48</td><td>1</td><td>TD2+ x1</td><td>N/A</td><td>N3K-C31108TC-V</td><td>BRLN</td><td>2</td><td>SSD</td><td>N/A</td><td>N/A</td><td>N/A</td><td>N/A</td><td>N/A</td><td>N/A</td><td>diag-sup-x86_64</td><td>N/A</td></tr>
 <tr><td>CALGARY</td><td>01/01/2016</td><td>CAGA</td><td>Y</td><td>N</td><td>N/A</td><td>32</td><td>N/A</td><td>N/A</td><td>DONNER x 1</td><td>TD2 x 1<
 '''
-# class seleniumTest(unittest.TestCase):
-class CGetAsicInfo(object):
+class CProductInfo(object):
     # def setUp(self):
     def __init__(self, url):
         print("====init====")
-        self.driver = webdriver.PhantomJS(executable_path="C:\\Users\\weihozha\\AppData\\Local\\Programs\\Python\\Python36-32\\Scripts\\phantomjs-2.1.1-windows\\bin\\phantomjs.exe")
+        self.driver = webdriver.PhantomJS(executable_path="/usr/bin/phantomjs")
         self.url = url
         self.driver.get(url)
-        self.board = []
+        self.boards = {}
+        self.header = {}
 
     '''
     found the match board according to the image key words
-    return the matched boards list
+    return the matched boards lista
+    first divs is the fullname header
+    2nd dive is the all boards name
+    3rd div is the colums name
+    '''
+
+    '''
+    3rd div data format:(col header)
+    <th class="header"><span>LaunchDate</span><div class="fht-cell" style="width: 96px;"></div></th>
+    <th class="header"><span>ShortName</span><div class="fht-cell" style="width: 116px;"></div></th>
+    '''
+    def GetColHeader(self, data):
+        dictDt = self.header
+        lstHd = []
+        lsts = data.findAll("span")
+
+        for itm in lsts :
+            strItm = str(itm).replace("<span>", "").replace("</span>", "").strip()
+            print(strItm)
+            lstHd.append(strItm)
+        dictDt["HEADER"] = lstHd
+        print(dictDt["HEADER"])
+        print("=================")
+
+        return
+
+    def GetAllBoardName(self, data):
+        dictDt = self.boards
+        lstHd = []
+        regExp = re.compile(r'>(\w+)<')
+        for itm in data :
+            lsts = itm.findAll("td")
+            rstName = regExp.search(str(lsts))
+            if rstName:
+                name = rstName.group(1)
+                dictDt[name] = None
+                print("=======Name:", rstName.group(1))
+        print(dictDt)
+        print("=================")
+
+    '''
+    parser all string
     '''
     def findBoards(self, imgKey):
-        tds = self.board
 
         driver = self.driver
         print("==findBoards===")
@@ -67,65 +108,134 @@ class CGetAsicInfo(object):
             idx = idx + 1
             rows = div.findAll('tr')
 
-            # print("===>>>>>", div)
-            # print("========<<<<<rows:", rows)
-            # continue
-            print("==============================================")
-            for row in rows :
-                lstItem = []
-                #if idx != 3
-                #continue
-                lst = row.findAll('td')
+            if idx == 3:
+                print("===>>>>>", div)
+                print("========<<<<<rows:", rows)
+                self.GetColHeader(rows[0])
+                continue
+            elif idx == 2:
+                self.GetAllBoardName(rows)
+                continue
+            elif idx == 1:
+                continue
+            else:
+                self.GetAllData(rows)
+
+    def GetAllData(self, data):
+        dictDt = self.boards
+        print("==============================================")
+        idx = 0
+        #regExp = re.compile(r'>([\w|\/|-]+)<')
+        regExp = re.compile(r'>([^\s]+)<')
+        for row in data :
+            idx = idx + 1
+            lstItem = []
+            #continue
+            lst = row.findAll('td')
+            col = 0
+            name = None
+            if idx <= 3:
+                print(lst)
+            if len(lst) == 0:
+                continue
+            for itm in lst:
+                rstStr = regExp.search(str(itm))
+                col = col + 1
+                rst = None
+                if rstStr:
+                    rst = rstStr.group(1)
+
+                if col == 1:
+                    name = rst
+                lstItem.append(rst)
+
+            dictDt[name] = lstItem
+            print("=======Name:", dictDt[name])
+        self.printBoards(dictDt)
+        return
+
+    def SearchItem(self, header, cmpkey):
+        keys = header + ":" + cmpkey
+        dValue = {}
+        itmlst = []
+        lsthdr = self.header["HEADER"]
+        brds = self.boards
+        idx = lsthdr.index(header)
+
+        for brd in brds:
+            # print(brd)
+            val = brds[brd]
+            itmstr = str(val[idx])
+            if itmstr.find(cmpkey) > 0:
+                strval = [val[0] , itmstr]
+                itmlst.append(strval)
+                # print(strval)
+
+        dValue[keys] = itmlst
+        self.printBoards(dValue)
+
+        return dValue
+
+
+
+
+
                 # print("Lenght:", leng)
-                # skip the header of table
-                if len(lst) <= 21:
-                    continue
-                #print("===row:", row)
-                #print("===lst:", lst)
-                '''
-                idx = int(idx) + 1
-                # print("==>>>>", row)
-                if idx == 5:
-                    print(row)
-                    print(row.findAll('td'))
-                '''
+            # skip the header of table
 
-                # find the image name
-                img = str(lst[21])
-                if img.find(imgKey) > 0:
-                    # print(img)
-                    # print(lst[9])
+   #  def Balalalala():
+   #     if idx == 3:
+   #         print("===row:", row)
+   #         print("===lst:", lst)
+   #         print("=====================$$$$$$$$$$$$==============")
+   #     #if len(lst) <= 21:
+   #     #    continue
+   #     '''
+   #     idx = int(idx) + 1
+   #     # print("==>>>>", row)
+   #     if idx == 5:
+   #         print(row)
+   #         print(row.findAll('td'))
+   #     '''
 
-                    # skip boards without asic
-                    asic = str(lst[9]).replace("<td>", "").replace("</td>", "").strip()
-                    if asic.find('N/A') != -1:
-                        asic = str(lst[10]).replace("<td>", "").replace("</td>", "").strip()
-                        if asic.find('N/A') != -1:
-                            continue
-                    str1 = str(lst[0]).replace("<td>", "").replace("</td>", "").strip()
-                    fnt = str1.find(">")
-                    fnt = fnt + 1
-                    name = str1[fnt:]
-                    lstItem.append(name.strip())
+   #     # find the image name
+   #     img = str(lst[21])
+   #     if img.find(imgKey) > 0:
+   #         # print(img)
+   #         # print(lst[9])
 
-                    pos = asic.find('x')
-                    if pos != -1:
-                        asic = asic[:pos].strip()
-                    lstItem.append(asic)
+   #         # skip boards without asic
+   #         asic = str(lst[9]).replace("<td>", "").replace("</td>", "").strip()
+   #         if asic.find('N/A') != -1:
+   #             asic = str(lst[10]).replace("<td>", "").replace("</td>", "").strip()
+   #             if asic.find('N/A') != -1:
+   #                 continue
+   #         str1 = str(lst[0]).replace("<td>", "").replace("</td>", "").strip()
+   #         fnt = str1.find(">")
+   #         fnt = fnt + 1
+   #         name = str1[fnt:]
+   #         lstItem.append(name.strip())
 
-                    lstItem.append(img.replace("<td>", "").replace("</td>", "").strip())
-                    print("!!%-12s %-20s"%(name,asic))
-                    # print(lstItem)
+   #         pos = asic.find('x')
+   #         if pos != -1:
+   #             asic = asic[:pos].strip()
+   #         lstItem.append(asic)
 
-                    tds.append(lstItem)
-        return tds
+   #     #    lstItem.append(img.replace("<td>", "").replace("</td>", "").strip())
+   #     #    print("!!%-12s %-20s"%(name,asic))
+   #     #    # print(lstItem)
 
-    def printBoards(self):
-        board_lst = self.board
-        for brd_itm in board_lst:
-            for val in brd_itm:
-                print("%-20s"%(val), end='')
-            print("")
+   #         tds.append(lstItem)
+   #     return tds
+
+    def printBoards(self, dList):
+        brd_dict = dList
+        for brd_itm in brd_dict:
+            val = brd_dict[brd_itm]
+            #print(val)
+            print("%-20s"%(val[0]), end='')
+            print("{}".format(val[1:]))
+            #print("")
 
 
 import xlrd
@@ -215,7 +325,7 @@ class CGetDataFromExcel(object):
 #            return -1
 
 def getDataFromExl_main(brd_lst):
-    path = "C:\\个人文档\\python-working\\cli-command.xlsx"
+    path = "./cli-command.xlsx"
     c = CGetDataFromExcel(path)
 
     for brd in brd_lst:
@@ -234,9 +344,10 @@ def test_main():
     tds = []
 
 def getInfoFromWeb_main(url, keys):
-    c = CGetAsicInfo(url)
+    c = CProductInfo(url)
     c.findBoards(keys)
-    c.printBoards()
+    dRst = c.SearchItem("BootImage",keys)
+    c.printBoards(dRst)
 
 def SaveData(file_name, data):
     fd = open(file_name, 'w+')
@@ -249,16 +360,20 @@ def SaveData(file_name, data):
     fd.close()
 
 
-if __name__ == "__main__":
-    cardKey = 'lc'
-    url = r'http://172.31.236.9/html/webtools/prodinfotbl.htm'
-    argc = len(sys.argv)
+def getDataFromExl(url):
     log = "C:\\个人文档\\python-working\\cli_output.txt"
 
     brd_lst = ["FOST", "PARIS", "BRLN", "REDLAKE", "BLUEWOOD", "SPUP", "MTBAKER"]
     data = getDataFromExl_main(brd_lst)
     SaveData(log, data)
-    #getInfoFromWeb_main(url, cardKey)
+
+
+if __name__ == "__main__":
+
+    cardKey = 'lc'
+    url = r'http://172.31.236.9/html/webtools/prodinfotbl.htm'
+    argc = len(sys.argv)
+    getInfoFromWeb_main(url, cardKey)
 
 
     # exit()
