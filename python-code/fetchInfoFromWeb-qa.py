@@ -9,6 +9,8 @@ import time
 import sys
 import os
 import re
+import getopt
+
 
 # https://www.crummy.com/software/BeautifulSoup/bs4/doc/index.zh.html#find
 # https://www.jianshu.com/p/520749be7377
@@ -68,11 +70,11 @@ class CProductInfo(object):
 
         for itm in lsts :
             strItm = str(itm).replace("<span>", "").replace("</span>", "").strip()
-            print(strItm)
+            # print(strItm)
             lstHd.append(strItm)
         dictDt["HEADER"] = lstHd
         print(dictDt["HEADER"])
-        print("=================")
+        print("============================================================")
 
         return
 
@@ -86,14 +88,14 @@ class CProductInfo(object):
             if rstName:
                 name = rstName.group(1)
                 dictDt[name] = None
-                print("=======Name:", rstName.group(1))
-        print(dictDt)
-        print("=================")
+                #print("=======Name:", rstName.group(1))
+        #print(dictDt)
+        #print("=================")
 
     '''
     parser all string
     '''
-    def findBoards(self, imgKey):
+    def findBoards(self):
 
         driver = self.driver
         print("==findBoards===")
@@ -109,8 +111,8 @@ class CProductInfo(object):
             rows = div.findAll('tr')
 
             if idx == 3:
-                print("===>>>>>", div)
-                print("========<<<<<rows:", rows)
+                #print("===>>>>>", div)
+                #print("========<<<<<rows:", rows)
                 self.GetColHeader(rows[0])
                 continue
             elif idx == 2:
@@ -123,7 +125,7 @@ class CProductInfo(object):
 
     def GetAllData(self, data):
         dictDt = self.boards
-        print("==============================================")
+        print("=======================boards=======================")
         idx = 0
         #regExp = re.compile(r'>([\w|\/|-]+)<')
         regExp = re.compile(r'>([^\s]+)<')
@@ -134,8 +136,8 @@ class CProductInfo(object):
             lst = row.findAll('td')
             col = 0
             name = None
-            if idx <= 3:
-                print(lst)
+            #if idx <= 3:
+            #    print(lst)
             if len(lst) == 0:
                 continue
             for itm in lst:
@@ -150,8 +152,9 @@ class CProductInfo(object):
                 lstItem.append(rst)
 
             dictDt[name] = lstItem
-            print("=======Name:", dictDt[name])
-        self.printBoards(dictDt)
+            #print("=======Name:", dictDt[name])
+        #self.printBoards(dictDt)
+
         return
 
     def SearchItem(self, header, cmpkey):
@@ -159,20 +162,30 @@ class CProductInfo(object):
         dValue = {}
         itmlst = []
         lsthdr = self.header["HEADER"]
+
+        if header not in lsthdr:
+            print("wrong column:", header)
+            print(lsthdr)
+            return dValue
+
         brds = self.boards
         idx = lsthdr.index(header)
-
+        print("Get index:", idx)
         for brd in brds:
-            # print(brd)
             val = brds[brd]
             itmstr = str(val[idx])
-            if itmstr.find(cmpkey) > 0:
-                strval = [val[0] , itmstr]
+
+            #print(brd)
+            #print(itmstr)
+            if itmstr.upper().find(cmpkey.upper()) >= 0:
+                if idx == 0:    # show boards all information
+                    strval = [itmstr, val[0:]]
+                else:           # just show board's column information
+                    strval = [val[0] , itmstr]
                 itmlst.append(strval)
-                # print(strval)
 
         dValue[keys] = itmlst
-        self.printBoards(dValue)
+        #self.printBoards(dValue)
 
         return dValue
 
@@ -228,8 +241,11 @@ class CProductInfo(object):
    #         tds.append(lstItem)
    #     return tds
 
-    def printBoards(self, dList):
-        brd_dict = dList
+    def printAllBoards(self):
+        brd_dict = self.boards
+        hdr_dict = self.header
+        print(hdr_dict["HEADER"])
+        print("============================All Boards=========================")
         for brd_itm in brd_dict:
             val = brd_dict[brd_itm]
             #print(val)
@@ -237,6 +253,16 @@ class CProductInfo(object):
             print("{}".format(val[1:]))
             #print("")
 
+    def printSearch(self, dList):
+        brd_dict = dList
+        for brd_itm in brd_dict:
+            print("=========%s========"%(brd_itm))
+            vallst = brd_dict[brd_itm]
+            for itm in vallst:
+                #print(val)
+                print("%-20s"%(itm[0]), end='')
+                print("{}".format(itm[1:]))
+            #print("")
 
 import xlrd
 class CGetDataFromExcel(object):
@@ -334,6 +360,7 @@ def getDataFromExl_main(brd_lst):
 
     return data
 
+
 # 还可以进一步实现在界面中去选着下拉框type的中的lc/fm等，来显示对应类型的board，实现与网页交互
 def test_main():
     url = r'http://172.31.236.9/html/webtools/prodinfotbl.htm'
@@ -345,9 +372,12 @@ def test_main():
 
 def getInfoFromWeb_main(url, keys):
     c = CProductInfo(url)
-    c.findBoards(keys)
-    dRst = c.SearchItem("BootImage",keys)
-    c.printBoards(dRst)
+    c.findBoards()
+    c.printAllBoards()
+    #dRst = c.SearchItem("BootImage",keys)
+    #c.printSearch(dRst)
+    dRst = c.SearchItem("InHouseAsic","SUG")
+    c.printSearch(dRst)
 
 def SaveData(file_name, data):
     fd = open(file_name, 'w+')
@@ -368,12 +398,91 @@ def getDataFromExl(url):
     SaveData(log, data)
 
 
+def usage():
+    """
+    The output  configuration file contents.
+    Usage: xxxxx.py [-f|--func,[get .....]] [-c|--column,[string]] [-h|--help] [-v|--version]
+    Description
+        -f,--func functions
+        -c,--column header string
+        -k,--key search string
+        -h,--help    Display help information.
+        -v,--version  Display version number.
+        for example:
+            python config.py -d 13
+            python config.py -c allow
+            python config.py -h
+            python config.py -d 13 -c allow
+    """
+
+funcType = -1
+headerStr = "FullName"
+keyStr = ""
+
+def parserOpt():
+    global funcType, headerStr, keyStr
+    funcType = 0
+    print("OPT===")
+    try:
+        options,args = getopt.getopt(sys.argv[1:], "f:c:k:hv", ["func=", "column=", "key=", "help", "version"])
+    except getopt.GetoptError as err:
+        print(str(err))
+        print(usage.__doc__)
+        sys.exit(1)
+    if not options:
+        print(usage.__doc__)
+        sys.exit(1)
+
+    for opt, a in options:
+        print("Get ==:", opt)
+        if opt in ("-h", "--help"):
+            print(usage.__doc__)
+        elif opt in ("-f", "--func"):
+            print("Get ==:", a)
+            if a in ("getweb"):
+                funcType = 1
+            elif a in ("sch"):
+                funcType = 2
+            elif a in ("web"):
+                funcType = 3
+            elif a in ("getfile"):
+                funcType = 4
+            elif a in ("write"):
+                funcType = 5
+            else:
+                print("invalid function!!!", a)
+        elif opt in ("-c", "--colum"):
+            headerStr = a
+        elif opt in ("-k", "--key"):
+            keyStr = a
+        else:
+            print("No para: will exe get all boards infor")
+
+
+
+
 if __name__ == "__main__":
 
-    cardKey = 'lc'
+    #cardKey = 'lc'
     url = r'http://172.31.236.9/html/webtools/prodinfotbl.htm'
-    argc = len(sys.argv)
-    getInfoFromWeb_main(url, cardKey)
+    #argc = len(sys.argv)
+    #getInfoFromWeb_main(url, cardKey)
+
+
+    parserOpt()
+#    cInfo = CProductInfo(url)
+#    dProdInfo = cInfo.findBoards()
+    print("Func:", funcType)
+    if funcType == 1:
+        cInfo = CProductInfo(url)
+        dProdInfo = cInfo.findBoards()
+        cInfo.printAllBoards()
+    elif funcType == 2:
+        cInfo = CProductInfo(url)
+        dProdInfo = cInfo.findBoards()
+        print("{}  keys:{}".format(headerStr, keyStr))
+        dRst = cInfo.SearchItem(headerStr, keyStr)
+        cInfo.printSearch(dRst)
 
 
     # exit()
