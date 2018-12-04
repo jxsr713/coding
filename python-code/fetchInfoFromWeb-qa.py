@@ -10,6 +10,7 @@ import sys
 import os
 import re
 import getopt
+import csv
 
 
 # https://www.crummy.com/software/BeautifulSoup/bs4/doc/index.zh.html#find
@@ -42,13 +43,26 @@ d>N/A</td><td>N/A</td><td>Jericho+</td><td>BifrostCPU</td><td>BFST</td><td>2</td
 '''
 class CProductInfo(object):
     # def setUp(self):
-    def __init__(self, url):
+    def __init__(self, srcFile, srcType):
         print("====init====")
-        self.driver = webdriver.PhantomJS(executable_path="/usr/bin/phantomjs")
-        self.url = url
-        self.driver.get(url)
         self.boards = {}
         self.header = {}
+        self.source = srcFile
+        self.web = srcType
+        return
+
+    def initWeb(self, url):
+        self.source = url
+        self.driver = webdriver.PhantomJS(executable_path="/usr/bin/phantomjs")
+        self.driver.get(url)
+        self.web = 1
+        return
+
+
+    def initCsv(self, csvFile):
+        self.source = csvFile
+        self.web = 0
+        return
 
     '''
     found the match board according to the image key words
@@ -64,6 +78,11 @@ class CProductInfo(object):
     <th class="header"><span>ShortName</span><div class="fht-cell" style="width: 116px;"></div></th>
     '''
     def GetColHeader(self, data):
+        if self.web == 0:
+            print("Not init web information yet!")
+            print("Please run initWeb(url)")
+            exit(0)
+
         dictDt = self.header
         lstHd = []
         lsts = data.findAll("span")
@@ -89,13 +108,19 @@ class CProductInfo(object):
                 name = rstName.group(1)
                 dictDt[name] = None
                 #print("=======Name:", rstName.group(1))
-        #print(dictDt)
+        print(sorted(dictDt))
         #print("=================")
+        return
+
 
     '''
     parser all string
     '''
-    def findBoards(self):
+    def findBoardsFromWeb(self):
+        if self.web == 0:
+            print("Not init web information yet!")
+            print("Please run initWeb(url)")
+            exit(0)
 
         driver = self.driver
         print("==findBoards===")
@@ -122,13 +147,16 @@ class CProductInfo(object):
                 continue
             else:
                 self.GetAllData(rows)
+        return
+
+
 
     def GetAllData(self, data):
         dictDt = self.boards
         print("=======================boards=======================")
         idx = 0
         #regExp = re.compile(r'>([\w|\/|-]+)<')
-        regExp = re.compile(r'>([^\s]+)<')
+        regExp = re.compile(r'>(.*)<')
         for row in data :
             idx = idx + 1
             lstItem = []
@@ -150,121 +178,178 @@ class CProductInfo(object):
                 if col == 1:
                     name = rst
                 lstItem.append(rst)
-
-            dictDt[name] = lstItem
+            if name  != None:
+                dictDt[name] = lstItem
             #print("=======Name:", dictDt[name])
         #self.printBoards(dictDt)
 
         return
 
-    def SearchItem(self, header, cmpkey):
-        keys = header + ":" + cmpkey
+    def SearchItem(self, keyLst, rstOpt):
+        #keys = header + ":" + cmpkey
         dValue = {}
         itmlst = []
+
         lsthdr = self.header["HEADER"]
-
-        if header not in lsthdr:
-            print("wrong column:", header)
-            print(lsthdr)
-            return dValue
-
         brds = self.boards
-        idx = lsthdr.index(header)
-        print("Get index:", idx)
+
         for brd in brds:
+            bfind = 1
             val = brds[brd]
-            itmstr = str(val[idx])
+            valList = []
+            # search header value
+            for keys in keyLst:
+                # parser keys (header:cmpkeys)
+                header = ""
+                cmpkey = ""
+                pos = keys.find(":") #spltChar)
+                if pos == -1:
+                    header = keys
+                elif pos == 0:
+                    print("Invalid keys:", keys)
+                    continue
+                else:
+                    header = keys[:pos]
+                    cmpkey=keys[pos+1:]
+                # find the index of header
+                if header not in lsthdr:
+                    print("wrong column:", header)
+                    print(lsthdr)
+                    continue
 
-            #print(brd)
-            #print(itmstr)
-            if itmstr.upper().find(cmpkey.upper()) >= 0:
-                if idx == 0:    # show boards all information
-                    strval = [itmstr, val[0:]]
-                else:           # just show board's column information
-                    strval = [val[0] , itmstr]
-                itmlst.append(strval)
+                idx = lsthdr.index(header)
+                #print("Header:{}   keys:{}".format(header, cmpkey))
+                #print("Get index:", idx)
+                # get the valude of header
+                itmstr = str(val[idx])
 
-        dValue[keys] = itmlst
+                #print(brd)
+                #print(itmstr)
+                if itmstr.upper().find(cmpkey.upper()) >= 0:
+                    valList.append(itmstr)
+                else:
+                    bfind = 0
+                    break
+                '''
+                    if rstOpt != 0:    # show boards some information
+                        #strval = [itmstr, val[0:]]
+                        #else:           # just show board's column information
+                        if rstOpt == 0: #save all header
+                            strval = [itmstr, val[0:]]
+                        else:
+                            strval = [val[0] , itmstr]
+                    itmlst.append(strval)
+                    '''
+            if bfind == 1:
+                if rstOpt == 0:
+                    dValue[brd] = val
+                else:
+                    dValue[brd] = valList
+
+                #print("{} : {}".format(brd, dValue[brd]))
+        #dValue[keys] = itmlst
         #self.printBoards(dValue)
 
         return dValue
 
+    def writeAllBrds2Csv(self, cvsFile):
+        brd_dict = self.boards
+        hdr_dict = self.header
+        # 打开方式用w,不要用wb，否则在后面的writerow时，会出现a bytes-like
+        # object is required, not 'str
+        with open(cvsFile, 'w',encoding='utf8',newline='') as f:
+            w = csv.writer(f)
+            w.writerow(hdr_dict["HEADER"])
+            lstSort = sorted(brd_dict.keys())
+            for brd in lstSort:
+                w.writerow(brd_dict[brd])
+
+        return
+
+    def findBoardsFromCsv(self, csvFile):
+        dictDt = self.boards
+        dictHdr = self.header
+        lstHd = []
+        with open(csvFile, 'r') as f:
+            data = csv.reader(f, delimiter=",")
+            idx = 0
+            for row in data:
+                if idx == 0:
+                    dictHdr["HEADER"] = row
+                else:
+                    dictDt[row[0]] = row
+                    #print("====", dictDt[row[0]])
+                idx = 1
+                #print("----------->",row)
+
+        return
 
 
+    # refer
+    # :::http://www.zhimengzhe.com/bianchengjiaocheng/qitabiancheng/127666.html
+    def readAllBrdsDictLstFromCsv_1(self, csvFile):
+        dictDt = self.boards
+        dictHdr = self.header
+        lstHd = []
+        with open(csvFile, 'r') as f:
+            data = csv.DictReader(f, delimiter=",")
+            for row in data:
+                print(row)
+
+        return
+
+    def readAllBrdsInfo(self):
+        if self.web == 1:
+            url = self.source
+            self.initWeb(url)
+            self.findBoardsFromWeb(url)
+        else:
+            csvFile = self.source
+            self.initCsv(csvFile)
+            self.findBoardsFromCsv(csvFile)
+        return
 
 
-                # print("Lenght:", leng)
-            # skip the header of table
-
-   #  def Balalalala():
-   #     if idx == 3:
-   #         print("===row:", row)
-   #         print("===lst:", lst)
-   #         print("=====================$$$$$$$$$$$$==============")
-   #     #if len(lst) <= 21:
-   #     #    continue
-   #     '''
-   #     idx = int(idx) + 1
-   #     # print("==>>>>", row)
-   #     if idx == 5:
-   #         print(row)
-   #         print(row.findAll('td'))
-   #     '''
-
-   #     # find the image name
-   #     img = str(lst[21])
-   #     if img.find(imgKey) > 0:
-   #         # print(img)
-   #         # print(lst[9])
-
-   #         # skip boards without asic
-   #         asic = str(lst[9]).replace("<td>", "").replace("</td>", "").strip()
-   #         if asic.find('N/A') != -1:
-   #             asic = str(lst[10]).replace("<td>", "").replace("</td>", "").strip()
-   #             if asic.find('N/A') != -1:
-   #                 continue
-   #         str1 = str(lst[0]).replace("<td>", "").replace("</td>", "").strip()
-   #         fnt = str1.find(">")
-   #         fnt = fnt + 1
-   #         name = str1[fnt:]
-   #         lstItem.append(name.strip())
-
-   #         pos = asic.find('x')
-   #         if pos != -1:
-   #             asic = asic[:pos].strip()
-   #         lstItem.append(asic)
-
-   #     #    lstItem.append(img.replace("<td>", "").replace("</td>", "").strip())
-   #     #    print("!!%-12s %-20s"%(name,asic))
-   #     #    # print(lstItem)
-
-   #         tds.append(lstItem)
-   #     return tds
+            #if sht_name.find
 
     def printAllBoards(self):
         brd_dict = self.boards
         hdr_dict = self.header
+        #print(brd_dict)
+        print("=====================================HEADER===================================")
         print(hdr_dict["HEADER"])
         print("============================All Boards=========================")
-        for brd_itm in brd_dict:
+        lstSort = sorted(brd_dict.keys())
+        #print(lstSort)
+        cnt = len(lstSort)
+        for brd_itm in lstSort:
             val = brd_dict[brd_itm]
             #print(val)
             print("%-20s"%(val[0]), end='')
             print("{}".format(val[1:]))
             #print("")
+        print("===============Get {} boards=============".format(cnt))
 
     def printSearch(self, dList):
         brd_dict = dList
-        for brd_itm in brd_dict:
-            print("=========%s========"%(brd_itm))
-            vallst = brd_dict[brd_itm]
-            for itm in vallst:
-                #print(val)
-                print("%-20s"%(itm[0]), end='')
-                print("{}".format(itm[1:]))
+        lstSort = sorted(brd_dict.keys())
+        for brd_itm in lstSort:
+            val = brd_dict[brd_itm]
+            print("%-20s"%(brd_itm), end='')
+            print("{}".format(val))
+
             #print("")
 
+
+# #################################################################################
+# ###
+#
 import xlrd
+
+
+
+
+
 class CGetDataFromExcel(object):
     def __init__(self, file):
         self.file = ""
@@ -345,7 +430,7 @@ class CGetDataFromExcel(object):
 
         return data
 
-            #if sht_name.find
+
 #        except Exception:
 #            print("open %s error: error is %s"%(file_name, "eror"))
 #            return -1
@@ -414,47 +499,72 @@ def usage():
             python config.py -h
             python config.py -d 13 -c allow
     """
+    print("{}     {}".format(paraKeys, paraLst))
+    print(g_funcLst)
+    print(g_funcHelp)
 
-funcType = -1
-headerStr = "FullName"
-keyStr = ""
+
+# ####################################################
+# ####################################################
+g_funcType = -1
+g_keysLst = []
+rstOpt = 0
+
+g_funcLst = ['help', 'getbrd', 'search' , 'save', 'print']
+g_funcHelp = ['Show command help',
+              'Show board all information',
+              'search some information',
+              'save boards into a csv file',
+              'print all boards'
+              ]
+
+paraKeys = "f:s:k:r:hv"
+paraLst =["func=", "src=", "key=", "rst=", "help", "version"]
+
+g_dataSrc = 0
+g_dataFrom = ['csv', 'web']
+g_datafile = ["product_info.csv", r'http://172.31.236.9/html/webtools/prodinfotbl.htm']
 
 def parserOpt():
-    global funcType, headerStr, keyStr
-    funcType = 0
+    global g_funcType, g_keyslst, g_funcLst, g_funcHelp, paraKeys, paraLst, g_dataSrc, g_datafile, g_dataFrom
+
     print("OPT===")
     try:
-        options,args = getopt.getopt(sys.argv[1:], "f:c:k:hv", ["func=", "column=", "key=", "help", "version"])
+        options,args = getopt.getopt(sys.argv[1:], paraKeys,  paraLst)
     except getopt.GetoptError as err:
         print(str(err))
         print(usage.__doc__)
+        usage()
         sys.exit(1)
     if not options:
         print(usage.__doc__)
+        usage()
         sys.exit(1)
 
     for opt, a in options:
         print("Get ==:", opt)
         if opt in ("-h", "--help"):
             print(usage.__doc__)
+            usage()
+            exit(0)
         elif opt in ("-f", "--func"):
             print("Get ==:", a)
-            if a in ("getweb"):
-                funcType = 1
-            elif a in ("sch"):
-                funcType = 2
-            elif a in ("web"):
-                funcType = 3
-            elif a in ("getfile"):
-                funcType = 4
-            elif a in ("write"):
-                funcType = 5
+            if a in g_funcLst:
+                g_funcType = g_funcLst.index(a)
             else:
                 print("invalid function!!!", a)
-        elif opt in ("-c", "--colum"):
-            headerStr = a
         elif opt in ("-k", "--key"):
-            keyStr = a
+            g_keysLst.append(a)
+        elif opt in ("-r", "--rst"):
+            # 0:all 1:single
+            rstOpt = a
+        elif opt in ("-s", "--src"):
+            if a in g_funcLst:
+                g_dataSrc = g_dataFrom.index(a)
+            else:
+                print("Please input data source :", g_dataFrom)
+                print("Will use default CSV file ")
+                g_dataSrc = 0
         else:
             print("No para: will exe get all boards infor")
 
@@ -463,26 +573,58 @@ def parserOpt():
 
 if __name__ == "__main__":
 
-    #cardKey = 'lc'
     url = r'http://172.31.236.9/html/webtools/prodinfotbl.htm'
-    #argc = len(sys.argv)
-    #getInfoFromWeb_main(url, cardKey)
-
 
     parserOpt()
-#    cInfo = CProductInfo(url)
-#    dProdInfo = cInfo.findBoards()
-    print("Func:", funcType)
-    if funcType == 1:
-        cInfo = CProductInfo(url)
-        dProdInfo = cInfo.findBoards()
-        cInfo.printAllBoards()
-    elif funcType == 2:
-        cInfo = CProductInfo(url)
-        dProdInfo = cInfo.findBoards()
-        print("{}  keys:{}".format(headerStr, keyStr))
-        dRst = cInfo.SearchItem(headerStr, keyStr)
-        cInfo.printSearch(dRst)
+    print("Func:", g_funcType)
 
+    if g_funcType < 1:
+        print("No function!!!")
+        exit(0)
+
+    # init class
+    cInfo = CProductInfo(g_datafile[g_dataSrc], g_dataSrc)
+
+    cInfo.readAllBrdsInfo()
+
+    print("Get keys list:", g_keysLst)
+    if g_funcType == 0:  # help
+        print(usage.__doc__)
+        usage()
+    elif g_funcType == 1:   # get board information
+        dSearch = cInfo.SearchItem(g_keysLst, 0)
+        cInfo.printSearch(dSearch)
+    elif g_funcType == 2:   # get board some information
+        dSearch = cInfo.SearchItem(g_keysLst, 1)
+        cInfo.printSearch(dSearch)
+    elif g_funcType == 3:   # save data to csv file
+        print("save information")
+        cInfo.writeAllBrds2Csv(strCsv)
+    elif g_funcType == 4:   # print all boards
+        cInfo.printAllBoards()
+    else:
+        print("No valid function!!!!")
+        exit(0)
+    '''
+        if funcType == 11:
+        elif funcType == 12:
+            cInfo.findBoardsFromCsv("test.csv")
+        cInfo.printAllBoards()
+    else:
+        # get product infor from web
+        cInfo = CProductInfo(url)
+        cInfo.initWeb(url)
+        dProdInfo = cInfo.findBoardsFromWeb()
+        if funcType == 1:
+            cInfo.printAllBoards()
+        elif funcType == 2:
+            print("{}  keys:{}".format(headerStr, keyStr))
+            dRst = cInfo.SearchItem(headerStr, keyStr, rstOpt)
+            cInfo.printSearch(dRst)
+        elif funcType == 5:
+            strCsv = "product_info.csv"
+            print(" writing info to {}".format(strCsv))
+            cInfo.writeAllBrds2Csv(strCsv)
+    '''
 
     # exit()
