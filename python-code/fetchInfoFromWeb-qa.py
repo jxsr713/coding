@@ -45,10 +45,15 @@ class CProductInfo(object):
     # def setUp(self):
     def __init__(self, srcFile, srcType):
         print("====init====")
+        self.debug = 0
         self.boards = {}
         self.header = {}
         self.source = srcFile
         self.web = srcType
+        return
+
+    def setDebug(self, dbg):
+        self.debug = dbg
         return
 
     def initWeb(self, url):
@@ -190,6 +195,7 @@ class CProductInfo(object):
         dValue = {}
         itmlst = []
 
+
         lsthdr = self.header["HEADER"]
         brds = self.boards
 
@@ -212,24 +218,46 @@ class CProductInfo(object):
                     header = keys[:pos]
                     cmpkey=keys[pos+1:]
                 # find the index of header
+                # '~': support not match operate
+                # if cmpkey[0] = ~, run not opt
+                bNot = 0
+                if cmpkey[0] == '~':
+                    bNot = 1
+                    cmpkey = cmpkey[1:]
+
                 if header not in lsthdr:
                     print("wrong column:", header)
                     print(lsthdr)
                     continue
 
+
                 idx = lsthdr.index(header)
-                #print("Header:{}   keys:{}".format(header, cmpkey))
+                #print("Header:{}   keys:{} {}".format(header, cmpkey, bNot))
                 #print("Get index:", idx)
                 # get the valude of header
                 itmstr = str(val[idx])
 
                 #print(brd)
                 #print(itmstr)
+                bMatched = 1
+
                 if itmstr.upper().find(cmpkey.upper()) >= 0:
-                    valList.append(itmstr)
+                    bMatched = 1
                 else:
-                    bfind = 0
+                    bMatched = 0
+                bfind = bMatched
+                if bNot == 1:
+                    if bMatched == 1:
+                        bfind = 0
+                    else:
+                        bfind = 1
+
+
+                #print("itmstr:{} Not:{} find:{}".format(itmstr, bNot, bfind))
+                if bfind == 0:
                     break
+
+                valList.append(itmstr)
                 '''
                     if rstOpt != 0:    # show boards some information
                         #strval = [itmstr, val[0:]]
