@@ -5,12 +5,13 @@ import os
 import pexpect
 import sys
 import argparse
+import getopt
 
 from pexpect import *
 import time
 
 
-def scp_file(ip, login, pwd, fileName):
+def scp_file_1(ip, login, pwd, fileName):
     cmd = 'scp ' + fileName + ' ' + login
     cmd = cmd + '@' + ip + ':/mnt'
     print("cmd::", cmd)
@@ -292,7 +293,7 @@ def get_msecli_ssd(ipAddr, child):
     # /diag/bin/msecli -L -d -n $PHYDEV`
     return
 
-def login_iplist_with_func(ipAddrLst, func, dictRtn):
+def login_iplist_with_func(ipAddrLst, func, dictRtn, conType):
     # 登录用户名
     loginName = 'diag'
     # 用户名密码
@@ -300,7 +301,7 @@ def login_iplist_with_func(ipAddrLst, func, dictRtn):
     failBrd = []
     for ipAddr in ipAddrLst:
         # print("IP:{}".format(ipAddr))
-        child = telnet_or_ssh_login(0, ipAddr, loginName, loginPassword, 0)
+        child = telnet_or_ssh_login(conType, ipAddr, loginName, loginPassword, 0)
         if(child == 0):
             # print("Failed to login %s" % (ipAddr))
             failBrd.append(ipAddr)
@@ -325,7 +326,7 @@ def get_ssd_func(child, dictRtn, ipAddr):
     child.sendline(cmd)
     index = child.expect([invprot, pexpect.EOF, pexpect.TIMEOUT])
     if(index == 0):
-        strBuff = child.before
+        strBuff = child.before.decode('utf-8')
         if debug == 1:
             print("\n\n======{}!!!!!!!!\n\n".format(strBuff))
         pattern = re.compile(r"TP=(\w+)")
@@ -350,7 +351,7 @@ def get_ssd_func(child, dictRtn, ipAddr):
     size = 0
     snstr = ""
     if(index == 0):
-        strBuff = child.before
+        strBuff = child.before.decode('utf-8')
         pattern = re.compile(r"User Capacity:.* \[(\d+)")
         matched = pattern.search(strBuff)
         size = matched.group(1) if(matched) else 0
@@ -390,9 +391,10 @@ def get_ssd_func(child, dictRtn, ipAddr):
 
 
 def get_ssd_info_v2(ipAddrLst):
+    conType = 0 # 1: telnet others: ssh
     dSSD = {}
     failbrd = []
-    failbrd = login_iplist_with_func(ipAddrLst, get_ssd_func, dSSD)
+    failbrd = login_iplist_with_func(ipAddrLst, get_ssd_func, dSSD, conType)
 
     keylst = sorted(dSSD)
     print("========print SSD info========")
@@ -402,7 +404,7 @@ def get_ssd_info_v2(ipAddrLst):
     if failbrd:
         print("There are some board failed to ssh {}:".format(failbrd))
         print("Try again!")
-        login_iplist_with_func(failbrd, get_ssd_func, dSSD)
+        login_iplist_with_func(failbrd, get_ssd_func, dSSD, conType)
 
 
     return
@@ -674,10 +676,159 @@ TestAddrLst = ["CT304", "COR16_8","COR16_1"]
 
 #######################################################################
 # define function
+g_funcType = -1
+rstOpt = 0
 
+g_funcLst = ['help', 'ssd_info', 'scp_brd' , 'telnet', 'ssh']
+g_funcHelp = ['Show command help',
+              'Show ssd information',
+              'scp file to a brd',
+              'telnet board',
+              'ssh brd'
+              ]
+
+paraKeys = "f:b:s:d:hv"
+paraLst =["func=", "board", "src=", "dst=", "help", "version"]
+
+g_dataSrc = 0
+g_dataFrom = ['csv', 'web']
+
+
+g_brdLst = []
+g_src=""
+g_dst=""
+
+
+
+def usage():
+    """
+    The output  configuration file contents.
+    Usage: xxxxx.py [-f|--func,[get .....]] [-c|--column,[string]] [-h|--help] [-v|--version]
+    Description
+        -f,--func functions
+        -c,--column header string
+        -k,--key search string
+        -h,--help    Display help information.
+        -v,--version  Display version number.
+        for example:
+            python config.py -d 13
+            python config.py -c allow
+            python config.py -h
+            python config.py -d 13 -c allow
+    """
+    print("{}     {}".format(paraKeys, paraLst))
+    print(g_funcLst)
+    print(g_funcHelp)
+
+##########################################################################
+def parserOpt():
+    global g_funcType, g_funcLst, g_funcHelp, paraKeys, paraLst
+    global g_brdLst, g_src, g_dst
+
+    try:
+        options,args = getopt.getopt(sys.argv[1:], paraKeys,  paraLst)
+    except getopt.GetoptError as err:
+        print(str(err))
+        print(usage.__doc__)
+        usage()
+        sys.exit(1)
+
+    if not options:
+        print(usage.__doc__)
+        usage()
+        sys.exit(1)
+
+    for opt, a in options:
+        print("Get ==:", opt)
+        if opt in ("-h", "--help"):
+            print(usage.__doc__)
+            usage()
+            exit(0)
+        elif opt in ("-f", "--func"):
+            print("Get ==:", a)
+            if a in g_funcLst:
+                g_funcType = g_funcLst.index(a)
+            else:
+                print("invalid function!!!", a)
+        elif opt in ("-b", "--board"):
+            g_brdLst.append(a)
+        elif opt in ("-s", "--src"):
+            # 0:all 1:single
+            g_src = a
+        elif opt in ("-d", "--dst"):
+            g_dst = a
+        else:
+            print("No para: will exe get all boards infor")
+    return
+
+############################################################################
+def ssd_info_func(brdlst):
+    brdcnt = len(brdlst)
+    lst = brdlst
+    if brdcnt == 1:
+        argv1 = brdlst[0]
+        if argv1 == "all-tor":
+            lst = TorAddrLst
+        elif argv1 == "all-eor":
+            print("EOR")
+            lst = EorAddrLst
+        elif argv1 == "all-sup2":
+            lst = Sup2AddrLst
+        elif argv1 == "test":
+            lst = TestAddrLst
+    print(lst)
+    get_ssd_info_v2(lst)
+    return
+
+def scp_func(brdlst, src, dst):
+    sys.path.insert(0, './')
+    from scp_image import scp_file
+    for brd in brdlst:
+        ret = scp_file(brd, src, dst)
+        if ret == 1:
+            print("Successfully copy!!!")
+    return
+
+############### login boards #############
+def login_func(child, para1, para2):
+    # first print board information
+    cmd = "echo TP=$INS_CARD_TYPE NUM=$INS_PRODUCT_NUM"
+    invprot = ']#'
+    child.sendline(cmd)
+    index = child.expect([invprot, pexpect.EOF, pexpect.TIMEOUT])
+    if(index == 0):
+        strBuff = child.before
+        print(strBuff)
+    child.interact()
+    return
+
+def login_brd_func(brdlst, conType):
+    # conType = 0 # 1: telnet others: ssh
+    dict1 = {}
+    failbrd = []
+    failbrd = login_iplist_with_func(brdlst, login_func, dict1, conType)
 
 ################################################
 if __name__ == '__main__':
+    parserOpt()
+    print("Func:", g_funcType)
+
+    if g_funcType == 0:  # help
+        print(usage.__doc__)
+        usage()
+    elif g_funcType == 1:   # get ssd information
+        ssd_info_func(g_brdLst)
+    elif g_funcType == 2:   # scp files to a brd
+        scp_func(g_brdLst, g_src, g_dst)
+    elif g_funcType == 3:   # login telnet
+        login_brd_func(g_brdLst, 1)
+    elif g_funcType == 4:   # ssh
+        login_brd_func(g_brdLst, 0)
+    else:
+        print("No valid function!!!!")
+        exit(0)
+    '''
+
     if len(sys.argv) >= 1:
         ipAddrLst = TestAddrLst
         if len(sys.argv) >= 2:
@@ -775,3 +926,5 @@ if __name__ == '__main__':
 
     child.close(True)
     print("OVER")
+    '''
+

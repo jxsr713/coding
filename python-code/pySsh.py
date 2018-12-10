@@ -4,6 +4,7 @@
 import paramiko
 import threading
 
+from pexpect import *
 
 def ssh2(ip, username, passwd, cmd):
     try:
@@ -25,6 +26,28 @@ def ssh2(ip, username, passwd, cmd):
     except:
         print('%s\tError\n'%(ip))
 
+
+def scp_file(ip, login, pwd, fileName):
+    cmd = 'scp ' + fileName + ' ' + login
+    cmd = cmd + '@' + ip + ':/mnt'
+    print("cmd::", cmd)
+    # 注意在events中的后面那个回车符\n
+    (command_output, exitstatus) = run(cmd, events={'password': pwd + '\n'},
+                                       withexitstatus=1)
+    # command_output = run(cmd, events={"[pP]assword": pwd+'\n'})
+    print(command_output)
+    if exitstatus == 0:
+        print("successfully copy file:", fileName)
+    else:
+        print("timeout")
+
+    return exitstatus == 0
+
+# 登录用户名
+loginName = 'diag'
+# 用户名密码
+loginPassword = 'ins123diag'
+loginprompt = '[$#>]|[\d]]'
 
 if __name__ == '__main__':
     cmd = ['cal', 'echo hello!']    # 你要执行的命令列表
