@@ -367,7 +367,15 @@ class CProductInfo(object):
             print("{}".format(val))
 
             #print("")
+        return
 
+    def printHeader(self):
+        hdr_dict = self.header
+        #print(brd_dict)
+        print("=====================================HEADER===================================")
+        print(hdr_dict["HEADER"])
+        print("============================================================")
+        return
 
 # #################################################################################
 # ###
@@ -538,12 +546,13 @@ g_funcType = -1
 g_keysLst = []
 rstOpt = 0
 
-g_funcLst = ['help', 'getbrd', 'search' , 'save', 'print']
+g_funcLst = ['help', 'getbrd', 'search' , 'save', 'print', 'header']
 g_funcHelp = ['Show command help',
               'Show board all information',
               'search some information',
               'save boards into a csv file',
-              'print all boards'
+              'print all boards',
+              'print header'
               ]
 
 paraKeys = "f:s:k:r:hv"
@@ -630,6 +639,8 @@ if __name__ == "__main__":
         cInfo.writeAllBrds2Csv(strCsv)
     elif g_funcType == 4:   # print all boards
         cInfo.printAllBoards()
+    elif g_funcType == 5:   # print header
+        cInfo.printHeader()
     else:
         print("No valid function!!!!")
         exit(0)
