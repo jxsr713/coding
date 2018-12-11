@@ -330,7 +330,7 @@ class CProductInfo(object):
         if self.web == 1:
             url = self.source
             self.initWeb(url)
-            self.findBoardsFromWeb(url)
+            self.findBoardsFromWeb()
         else:
             csvFile = self.source
             self.initCsv(csvFile)
@@ -596,7 +596,7 @@ def parserOpt():
             # 0:all 1:single
             rstOpt = a
         elif opt in ("-s", "--src"):
-            if a in g_funcLst:
+            if a in g_dataFrom:
                 g_dataSrc = g_dataFrom.index(a)
             else:
                 print("Please input data source :", g_dataFrom)
