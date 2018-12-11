@@ -1,14 +1,36 @@
 #!/usr/bin/python3.3
 # -*- coding: utf-8 -*-
+##################################################################
+# logs:
+# 2018/12/08: check ssh login boards
+# 2018/12/10: create new class CPexpect4Diag
+##################################################################
+
 import re
 import os
 import pexpect
 import sys
 import argparse
 import getopt
-
-from pexpect import *
 import time
+
+
+#################################################################
+# the class is come from pexpect
+# the class include SSH, TELNET ,SCP or run some commands function
+# the class only includes these function
+#################################################################
+class CPexpect4Diag(object):
+    def __init__(self, conType):
+        self.loginType = 0  # 0 SSH; others: TELNET
+        self.child = None
+        return
+
+    def loginBrd(self, brd, conType=0):
+
+        loginType = self.loginType
+
+        return
 
 
 def scp_file_1(ip, login, pwd, fileName):
