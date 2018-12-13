@@ -3,8 +3,6 @@
 
 import urllib.request
 import unittest
-from selenium import webdriver
-from bs4 import BeautifulSoup
 import time
 import sys
 import os
@@ -58,8 +56,7 @@ class CProductInfo(object):
 
     def initWeb(self, url):
         self.source = url
-        self.driver = webdriver.PhantomJS(executable_path="/usr/bin/phantomjs")
-        self.driver.get(url)
+        self.driver = ""
         self.web = 1
         return
 
@@ -127,6 +124,11 @@ class CProductInfo(object):
             print("Please run initWeb(url)")
             exit(0)
 
+        from selenium import webdriver
+        from bs4 import BeautifulSoup
+
+        self.driver = webdriver.PhantomJS(executable_path="/usr/bin/phantomjs")
+        self.driver.get(url)
         driver = self.driver
         print("==findBoards===")
         #print driver
