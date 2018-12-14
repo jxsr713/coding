@@ -65,8 +65,10 @@ def telnet_or_ssh_login(conType, ipAddress, loginName, loginPassword, debug):
     lstexpect = []
     login = 0
     # 提示符，可能是’ $ ’ , ‘ # ’或’ > ’ 和 dsh下的[xx]
+
     loginprompt = '[[\d]]|[\~\]\#]'
-    #loginprompt = '~]#'
+    if conType != 1:    # ssh
+        loginprompt = '~]#'
 
     lstexpect.append("login")           # index 0
     lstexpect.append("[pP]assword")     # index 1
@@ -79,11 +81,13 @@ def telnet_or_ssh_login(conType, ipAddress, loginName, loginPassword, debug):
     if conType == 1:    # telnet
         cmd = 'telnet ' + ipAddress
     else:               # ssh
+        loginprompt = '~]#'
         cmd = 'ssh ' + loginName + '@' + ipAddress
     if(debug == 1):
         print("Cmd:", cmd)
     # 为 telnet 生成 spawn 类子程序
     child = pexpect.spawn(cmd, encoding='utf-8')
+    #child = pexpect.spawn(cmd)
     # 将结果直接输出到屏幕上, 如果python版本是3.3，下面的语句会发生：
     # TypeError: must be str, not bytes
     if(debug == 1):
@@ -93,7 +97,7 @@ def telnet_or_ssh_login(conType, ipAddress, loginName, loginPassword, debug):
     # 期待'login'字符串出现，从而接下来可以输入用户名
     while True:
         index = child.expect(lstexpect)
-        print("index:%d" % (index))
+        #print("index:%d" % (index))
         if(debug == 1):
             print("index:%d" % (index))
         if(index == 0):
@@ -129,195 +133,195 @@ def telnet_or_ssh_login(conType, ipAddress, loginName, loginPassword, debug):
 
     return 0
 
-
-def get_hdparm_sec_erase(ipAddr, child):
-    # 登录用户名
-    loginName = 'diag'
-    # 用户名密码
-    loginPassword = 'ins123diag'
-    loginprompt = '~]#'
-    # ipAdadr = "COR16_1"
-    debug = 0
-    print("\n\n====================={}================".format(ipAddr))
-    child = telnet_or_ssh_login(0, ipAddr, loginName, loginPassword, debug)
-    if(child == 0):
-        print("Failed to login %s" % (ipAddr))
-        return -1
-
-
-def get_hdparm_sec_erase(ipAddr, child):
-    loginprompt = '~]#'
-    errptrn = re.compile(r"(missing|failed|error)")
-
-    cmd = "hdparm -I /dev/sda"
-    invprot = "Checksum"
-    child.sendline(cmd)
-    index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
-    if(index == 0):
-        strBuff = child.before
-        # print(strBuff)
-        pattern = re.compile(r"Model Number:       ([\w|-]*)")
-        matched = pattern.search(strBuff)
-        if(matched):
-            modelNm = matched.group(1)
-        else:
-            print("Failed to find model")
+class cSsdFuncModule(object):
+    def get_hdparm_sec_erase(ipAddr, child):
+        # 登录用户名
+        loginName = 'diag'
+        # 用户名密码
+        loginPassword = 'ins123diag'
+        loginprompt = '~]#'
+        # ipAdadr = "COR16_1"
+        debug = 0
+        print("\n\n====================={}================".format(ipAddr))
+        child = telnet_or_ssh_login(0, ipAddr, loginName, loginPassword, debug)
+        if(child == 0):
+            print("Failed to login %s" % (ipAddr))
             return -1
 
-        pattern = re.compile(r"user addressable sectors:(\s*)(\d*)")
-        matched = pattern.search(strBuff)
-        if(matched):
-            lbaCnt = int(matched.group(2))
-            NewlbaCnt=lbaCnt/2
+
+    def get_hdparm_sec_erase(ipAddr, child):
+        loginprompt = '~]#'
+        errptrn = re.compile(r"(missing|failed|error)")
+
+        cmd = "hdparm -I /dev/sda"
+        invprot = "Checksum"
+        child.sendline(cmd)
+        index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
+        if(index == 0):
+            strBuff = child.before
+            # print(strBuff)
+            pattern = re.compile(r"Model Number:       ([\w|-]*)")
+            matched = pattern.search(strBuff)
+            if(matched):
+                modelNm = matched.group(1)
+            else:
+                print("Failed to find model")
+                return -1
+
+            pattern = re.compile(r"user addressable sectors:(\s*)(\d*)")
+            matched = pattern.search(strBuff)
+            if(matched):
+                lbaCnt = int(matched.group(2))
+                NewlbaCnt=lbaCnt/2
+            else:
+                print("Failed to lba counter")
+                return -1
+        child.buffer = ""
+        print("=========Get {} LBACNT :::: {}=========".format(modelNm, lbaCnt))
+
+        cmd = "hdparm --user-master u --security-set-pass Eins /dev/sda"
+        child.sendline(cmd)
+        index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
+        if(index == 0):
+            strBuff = child.before
+            # print(strBuff)
         else:
-            print("Failed to lba counter")
+            print("Timeout ")
             return -1
-    child.buffer = ""
-    print("=========Get {} LBACNT :::: {}=========".format(modelNm, lbaCnt))
+        matched = errptrn.search(strBuff)
+        if(matched):
+            print(strBuff)
+        child.buffer = ""
 
-    cmd = "hdparm --user-master u --security-set-pass Eins /dev/sda"
-    child.sendline(cmd)
-    index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
-    if(index == 0):
-        strBuff = child.before
+        # cmd = "hdparm --user-master u --security-set-pass Eins111 /dev/sda"
+        cmd = "hdparm --user-master u --security-erase Eins /dev/sda"
+        print("Security erase.......")
+        child.sendline(cmd)
+        index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
+        if(index == 0):
+            strBuff = child.before
+        else:
+            print("Timeout ")
+            return -1
+        matched = errptrn.search(strBuff)
+        if(matched):
+            print(strBuff)
+
+        cmd = "hdparm -N /dev/sda"
+        child.sendline(cmd)
+        index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
+        if(index == 0):
+            strBuff = child.before
+        else:
+            print("Timeout ")
+            return -1
+        matched = errptrn.search(strBuff)
+        if(matched):
+            print("ERROR::::::{}".format(strBuff))
+
+        pttn = re.compile(r"max sectors   = (\d+)/(\d+)")
+        matched = pttn.search(strBuff)
+        if(matched):
+            lbaCnt = int(matched.group(1))
+            TotalCnt = int(matched.group(2))
+        else:
+            print("Faild to get count")
+            print(strBuff)
+            return -1
+        print("{} / {}".format(lbaCnt, TotalCnt))
+        NewlbaCnt = TotalCnt/2
+        cmd = "hdparm -Np" + str(NewlbaCnt) + " --yes-i-know-what-i-am-doing /dev/sda"
+        print(cmd)
+        child.sendline(cmd)
+        index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
+        if(index == 0):
+            strBuff = child.before
+        else:
+            print("Timeout ")
+            return -1
         # print(strBuff)
-    else:
-        print("Timeout ")
-        return -1
-    matched = errptrn.search(strBuff)
-    if(matched):
+        matched = errptrn.search(strBuff)
+        if(matched):
+            print("ERROR::::::\n{}\n::::::::::::".format(strBuff))
+
+        cmd = "hdparm -N /dev/sda"
+        child.sendline(cmd)
+        index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
+        if(index == 0):
+            strBuff = child.before
+        else:
+            print("Timeout ")
+            return -1
+
+        pttn = re.compile(r"max sectors   = (\d+)/(\d+)")
+        matched = pttn.search(strBuff)
+        if(matched):
+            lbaCnt = int(matched.group(1))
+            TotalCnt = int(matched.group(2))
+        else:
+            print("Faild to get count")
+            print(strBuff)
+            return -1
+        print("{} / {}".format(lbaCnt, TotalCnt))
+
+        ################### retore count #############
+        print("========restore orignal setting======")
+        time.sleep(10)
+        NewlbaCnt = TotalCnt
+        # cmd = "hdparm -Np" + str(NewlbaCnt) + " --yes-i-know-what-i-am-doing /dev/sda"
+        cmd = "hdparm -N /dev/sda"
+        print(cmd)
+        child.sendline(cmd)
+        index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
+        if(index == 0):
+            strBuff = child.before
+        else:
+            print("Timeout ")
+            return -1
+        # print(strBuff)
+        matched = errptrn.search(strBuff)
+        if(matched):
+            print("ERROR::::::{}".format(strBuff))
+
+        cmd = "hdparm -N /dev/sda"
+        child.sendline(cmd)
+        index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
+        if(index == 0):
+            strBuff = child.before
+        else:
+            print("Timeout ")
+            return -1
+
+        pttn = re.compile(r"max sectors   = (\d+)/(\d+)")
+        matched = pttn.search(strBuff)
+        if(matched):
+            lbaCnt = int(matched.group(1))
+            TotalCnt = int(matched.group(2))
+        else:
+            print("Faild to get count")
+            print(strBuff)
+            return -1
+        print("{} / {}".format(lbaCnt, TotalCnt))
+
+        #########################################################
+        cmd = ""
+        child.sendline(cmd)
+        index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
+        if(index == 0):
+            strBuff = child.before
+        else:
+            print("Timeout ")
+            return -1
         print(strBuff)
-    child.buffer = ""
 
-    # cmd = "hdparm --user-master u --security-set-pass Eins111 /dev/sda"
-    cmd = "hdparm --user-master u --security-erase Eins /dev/sda"
-    print("Security erase.......")
-    child.sendline(cmd)
-    index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
-    if(index == 0):
-        strBuff = child.before
-    else:
-        print("Timeout ")
-        return -1
-    matched = errptrn.search(strBuff)
-    if(matched):
-        print(strBuff)
-
-    cmd = "hdparm -N /dev/sda"
-    child.sendline(cmd)
-    index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
-    if(index == 0):
-        strBuff = child.before
-    else:
-        print("Timeout ")
-        return -1
-    matched = errptrn.search(strBuff)
-    if(matched):
-        print("ERROR::::::{}".format(strBuff))
-
-    pttn = re.compile(r"max sectors   = (\d+)/(\d+)")
-    matched = pttn.search(strBuff)
-    if(matched):
-        lbaCnt = int(matched.group(1))
-        TotalCnt = int(matched.group(2))
-    else:
-        print("Faild to get count")
-        print(strBuff)
-        return -1
-    print("{} / {}".format(lbaCnt, TotalCnt))
-    NewlbaCnt = TotalCnt/2
-    cmd = "hdparm -Np" + str(NewlbaCnt) + " --yes-i-know-what-i-am-doing /dev/sda"
-    print(cmd)
-    child.sendline(cmd)
-    index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
-    if(index == 0):
-        strBuff = child.before
-    else:
-        print("Timeout ")
-        return -1
-    # print(strBuff)
-    matched = errptrn.search(strBuff)
-    if(matched):
-        print("ERROR::::::\n{}\n::::::::::::".format(strBuff))
-
-    cmd = "hdparm -N /dev/sda"
-    child.sendline(cmd)
-    index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
-    if(index == 0):
-        strBuff = child.before
-    else:
-        print("Timeout ")
-        return -1
-
-    pttn = re.compile(r"max sectors   = (\d+)/(\d+)")
-    matched = pttn.search(strBuff)
-    if(matched):
-        lbaCnt = int(matched.group(1))
-        TotalCnt = int(matched.group(2))
-    else:
-        print("Faild to get count")
-        print(strBuff)
-        return -1
-    print("{} / {}".format(lbaCnt, TotalCnt))
-
-    ################### retore count #############
-    print("========restore orignal setting======")
-    time.sleep(10)
-    NewlbaCnt = TotalCnt
-    # cmd = "hdparm -Np" + str(NewlbaCnt) + " --yes-i-know-what-i-am-doing /dev/sda"
-    cmd = "hdparm -N /dev/sda"
-    print(cmd)
-    child.sendline(cmd)
-    index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
-    if(index == 0):
-        strBuff = child.before
-    else:
-        print("Timeout ")
-        return -1
-    # print(strBuff)
-    matched = errptrn.search(strBuff)
-    if(matched):
-        print("ERROR::::::{}".format(strBuff))
-
-    cmd = "hdparm -N /dev/sda"
-    child.sendline(cmd)
-    index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
-    if(index == 0):
-        strBuff = child.before
-    else:
-        print("Timeout ")
-        return -1
-
-    pttn = re.compile(r"max sectors   = (\d+)/(\d+)")
-    matched = pttn.search(strBuff)
-    if(matched):
-        lbaCnt = int(matched.group(1))
-        TotalCnt = int(matched.group(2))
-    else:
-        print("Faild to get count")
-        print(strBuff)
-        return -1
-    print("{} / {}".format(lbaCnt, TotalCnt))
-
-    #########################################################
-    cmd = ""
-    child.sendline(cmd)
-    index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
-    if(index == 0):
-        strBuff = child.before
-    else:
-        print("Timeout ")
-        return -1
-    print(strBuff)
-
-    return 0
+        return 0
 
 
-def get_msecli_ssd(ipAddr, child):
-    # /diag/bin/msecli -L -d -n /dev/sda
-    # /diag/bin/msecli -M -o $NEW_MAX_LBA -z -n $PHYDEV
-    # /diag/bin/msecli -L -d -n $PHYDEV`
-    return
+    def get_msecli_ssd(ipAddr, child):
+        # /diag/bin/msecli -L -d -n /dev/sda
+        # /diag/bin/msecli -M -o $NEW_MAX_LBA -z -n $PHYDEV
+        # /diag/bin/msecli -L -d -n $PHYDEV`
+        return
 
 def login_iplist_with_func(ipAddrLst, func, dictRtn, conType):
     # 登录用户名
@@ -352,7 +356,7 @@ def get_ssd_func(child, dictRtn, ipAddr):
     child.sendline(cmd)
     index = child.expect([invprot, pexpect.EOF, pexpect.TIMEOUT])
     if(index == 0):
-        strBuff = child.before.decode('utf-8')
+        strBuff = child.before
         if debug == 1:
             print("\n\n======{}!!!!!!!!\n\n".format(strBuff))
         pattern = re.compile(r"TP=(\w+)")
@@ -377,7 +381,7 @@ def get_ssd_func(child, dictRtn, ipAddr):
     size = 0
     snstr = ""
     if(index == 0):
-        strBuff = child.before.decode('utf-8')
+        strBuff = child.before
         pattern = re.compile(r"User Capacity:.* \[(\d+)")
         matched = pattern.search(strBuff)
         size = matched.group(1) if(matched) else 0
@@ -435,6 +439,46 @@ def get_ssd_info_v2(ipAddrLst):
 
     return
 
+def get_build_machine_main(ipAddrLst):
+    conType = 0 # 1: telnet others: ssh
+    dRet = {}
+    failbrd = []
+    failbrd = login_iplist_with_func(ipAddrLst, get_build_machin_func, dRet, conType)
+
+    keylst = sorted(dRet)
+    for dKeys in keylst:
+        print("{}:{}".format(dKeys, dRet[dKeys]))
+
+    return
+
+def get_build_machin_func(child, dRet, ipAddr):
+    board = ""
+    debug = 0
+    lst = []
+    # Get information of boards
+    child.buffer = ""
+    # get information of SSD
+    cmd = "version | grep \"Build machine\""
+    loginprompt = '[[\d]]|[\~\]\#]'
+    if debug == 1:
+        print("Run cmd:{}".format(cmd))
+    child.sendline(cmd)
+    index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
+    build = ""
+    if index == 0:
+        strBuff = child.before
+        if debug == 1:
+            print(strBuff)
+        pattern = re.compile(r"Build machine:\s+(\w+)")
+        matched = pattern.search(strBuff)
+        build = matched.group(1) if(matched) else ""
+        if debug == 1:
+            print(build)
+    if build != "":
+        lst = dRet[build] if build in dRet.keys() else []
+        lst.append(ipAddr)
+        dRet[build] = lst
+    return
 
 def get_ssd_info(ipAddrLst):
 
@@ -471,19 +515,16 @@ def get_ssd_info(ipAddrLst):
             # print("\n\n======{}!!!!!!!!\n\n".format(strBuff))
             pattern = re.compile(r"Card type \(env\) = ([\w|-]*)")
             matched = pattern.search(strBuff)
-            if(matched):
-                board = matched.group(1)
+            board = matched.group(1) if (matched) else ""
 
             pattern = re.compile(r"PRODUCT_NUMBER  : ([\w|-]*)")
             matched = pattern.search(strBuff)
-            if(matched):
-                product = matched.group(1)
+            product = matched.group(1) if (matched) else ""
 
             pattern = re.compile(r"Gbps  Model=([\w|-]*)")
             matched = pattern.search(strBuff)
-            if(matched):
-                snstr = matched.group(1)
-            else:
+            snstr = matched.group(1) if (matched) else ""
+            if snstr == "":
                 continue
         cmd = "/diag/bin/smartctl -i /dev/sda | grep \"User Capacity:\" | awk -F [ '{ print \"SIZE:\" $2 }' "
         # cmd = "/diag/bin/smartctl -i /dev/sda"
@@ -503,9 +544,7 @@ def get_ssd_info(ipAddrLst):
                 size = matched.group(1)
             else:
                 continue
-        flag = ""
-        if(snstr.find(size) == -1):
-            flag = "Size unmatched!!"
+        flag = "Size unmatched!!" if(snstr.find(size) == -1) else ""
 
         # print("@@@@@@@@@@\n\n======{}\naaaaaa".format(child.buffer))
         print("{}: {} {}: {} SIZE:{} {}".format(ipAddr, board,
@@ -705,12 +744,12 @@ TestAddrLst = ["CT304", "COR16_8","COR16_1"]
 g_funcType = -1
 rstOpt = 0
 
-g_funcLst = ['help', 'ssd_info', 'scp_brd' , 'telnet', 'ssh']
+g_funcLst = ['help', 'ssd_info', 'scp_brd' , 'telnet', 'ssh', 'test']
 g_funcHelp = ['Show command help',
               'Show ssd information',
               'scp file to a brd',
               'telnet board',
-              'ssh brd'
+              'ssh brd', 'test func'
               ]
 
 paraKeys = "f:b:s:d:hv"
@@ -806,6 +845,26 @@ def ssd_info_func(brdlst):
     get_ssd_info_v2(lst)
     return
 
+############################################################################
+def build_machine_func(brdlst):
+    brdcnt = len(brdlst)
+    lst = brdlst
+    if brdcnt == 1:
+        argv1 = brdlst[0]
+        if argv1 == "all-tor":
+            lst = TorAddrLst
+        elif argv1 == "all-eor":
+            print("EOR")
+            lst = EorAddrLst
+        elif argv1 == "all-sup2":
+            lst = Sup2AddrLst
+        elif argv1 == "test":
+            lst = TestAddrLst
+    print(lst)
+    get_build_machine_main(lst)
+    return
+
+
 def scp_func(brdlst, src, dst):
     sys.path.insert(0, './')
     from scp_image import scp_file
@@ -854,6 +913,8 @@ if __name__ == '__main__':
         login_brd_func(g_brdLst, 1)
     elif g_funcType == 4:   # ssh
         login_brd_func(g_brdLst, 0)
+    elif g_funcType == 5:   # ssh
+        build_machine_func(g_brdLst)
     else:
         print("No valid function!!!!")
         exit(0)

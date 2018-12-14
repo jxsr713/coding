@@ -10,8 +10,14 @@ class CQaBrdsInfo(object):
         self.dBrdsInfo={}
         self.dCardDataBase=dCardData
         self.debug = debug
+        self.json = "qa.json"
         return
 
+    def setJson(self, fJson=""):
+        self.json = fJson
+        if fJson == "":
+            self.json = "qa.json"
+        return
 
     def printChassisInfo(self, dChassis):
         idx = 0
@@ -129,6 +135,27 @@ class CQaBrdsInfo(object):
         dEORInfo[name] = dItem
 
         return dEORInfo
+
+    def loadDataFromJson(self, filePath=""):
+        import json
+        if filePath == "":
+            filePath = self.json
+        if os.path.exists(filePath) == False:
+            print("{} not exist!!".format(filePath))
+            return -1
+        with open(filePath, 'r') as f:
+            dData = json.load(f)
+        self.dBrdsInfo=dData
+
+        return 0
+
+    def saveDataToJson(self, filePath):
+        import json
+        dData = self.dBrdsInfo
+        with open(filePath, 'w') as f:
+            json.dump(dData, f)
+        return 0
+
 
     '''
     : read system info file to get the information of chassises
@@ -378,6 +405,7 @@ strTorFile = "/home/honjiang/diag_qa/TOR/P_system_info_dev_tor.tcl"
 strEorFile = "/home/honjiang/diag_qa/EOR/./P_system_info_dev_new_sup.tcl"
 strTestFile = "./system_info_tor.tcl"
 strEorSys = "/home/ins-diag-qa/sys_cfg/"
+strJson = 'qa.json'
 
 g_src = strTestFile
 
