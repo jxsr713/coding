@@ -65,8 +65,8 @@ def telnet_or_ssh_login(conType, ipAddress, loginName, loginPassword, debug):
     lstexpect = []
     login = 0
     # 提示符，可能是’ $ ’ , ‘ # ’或’ > ’ 和 dsh下的[xx]
-    loginprompt = '[$#>]|[\d]]'
-    loginprompt = '~]#'
+    loginprompt = '[[\d]]|[\~\]\#]'
+    #loginprompt = '~]#'
 
     lstexpect.append("login")           # index 0
     lstexpect.append("[pP]assword")     # index 1
@@ -83,7 +83,7 @@ def telnet_or_ssh_login(conType, ipAddress, loginName, loginPassword, debug):
     if(debug == 1):
         print("Cmd:", cmd)
     # 为 telnet 生成 spawn 类子程序
-    child = pexpect.spawn(cmd)
+    child = pexpect.spawn(cmd, encoding='utf-8')
     # 将结果直接输出到屏幕上, 如果python版本是3.3，下面的语句会发生：
     # TypeError: must be str, not bytes
     if(debug == 1):
@@ -93,6 +93,7 @@ def telnet_or_ssh_login(conType, ipAddress, loginName, loginPassword, debug):
     # 期待'login'字符串出现，从而接下来可以输入用户名
     while True:
         index = child.expect(lstexpect)
+        print("index:%d" % (index))
         if(debug == 1):
             print("index:%d" % (index))
         if(index == 0):
@@ -119,6 +120,9 @@ def telnet_or_ssh_login(conType, ipAddress, loginName, loginPassword, debug):
                 print("telnet login failed, due to TIMEOUT or EOF")
             child.close(True)
             break
+    # if run spaw without "encoding='utf-8'" in py3.3
+    # the follow line code cause a error
+    # " does not support the buffer interface"
     child.buffer = ""
     if login == 1:
         return child
@@ -322,7 +326,7 @@ def login_iplist_with_func(ipAddrLst, func, dictRtn, conType):
     loginPassword = 'ins123diag'
     failBrd = []
     for ipAddr in ipAddrLst:
-        # print("IP:{}".format(ipAddr))
+        #print("IP:{}".format(ipAddr))
         child = telnet_or_ssh_login(conType, ipAddr, loginName, loginPassword, 0)
         if(child == 0):
             # print("Failed to login %s" % (ipAddr))
@@ -812,16 +816,20 @@ def scp_func(brdlst, src, dst):
     return
 
 ############### login boards #############
-def login_func(child, para1, para2):
+def login_func(child, para1, ipAddr):
     # first print board information
+    print("=========login {}==========".format(ipAddr))
     cmd = "echo TP=$INS_CARD_TYPE NUM=$INS_PRODUCT_NUM"
-    invprot = ']#'
+    cmd = "pwd"
+    invprot = '[[\d]]|[\~\]\#]'
     child.sendline(cmd)
     index = child.expect([invprot, pexpect.EOF, pexpect.TIMEOUT])
     if(index == 0):
         strBuff = child.before
-        print(strBuff)
+        # print(strBuff+child.after)
+    child.sendline()
     child.interact()
+    print("\n======8-8======")
     return
 
 def login_brd_func(brdlst, conType):

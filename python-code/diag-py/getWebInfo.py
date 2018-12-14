@@ -41,7 +41,7 @@ d>N/A</td><td>N/A</td><td>Jericho+</td><td>BifrostCPU</td><td>BFST</td><td>2</td
 '''
 class CProductInfo(object):
     # def setUp(self):
-    def __init__(self, srcFile, srcType):
+    def __init__(self, srcFile, srcType=0):
         print("====init====")
         self.debug = 0
         self.boards = {}

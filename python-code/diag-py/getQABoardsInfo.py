@@ -5,7 +5,7 @@ import re
 import os
 
 class CQaBrdsInfo(object):
-    def __init__(self, infofile, dCardData={}, debug=0):
+    def __init__(self, infofile, dCardData, debug=0):
         self.fileName = infofile
         self.dBrdsInfo={}
         self.dCardDataBase=dCardData
@@ -49,7 +49,8 @@ class CQaBrdsInfo(object):
         name=""
         if rstName:
             name = rstName.group(1)
-            print("=================\nName:", rstName.group(1))
+            if debug == 1:
+                print("=================\nName:", rstName.group(1))
         else:
             return None
 
@@ -61,12 +62,13 @@ class CQaBrdsInfo(object):
             if debug == 1:
                 print("IP:", resSup1.group(1), end='  ')
                 print("port:", resSup1.group(2))
-            sup1 = resSup1.group(1) + " " + resSup1.group(2)
+            sup1 = resSup1.group(1) + " 20" + resSup1.group(2)
         # check if the ip address is valid
         reExp = re.compile(r'(\d+)\.(\d+)\.(\d+)\.(\d+)')
         reVal = (reExp.search(sup1) is  None)
         if reVal is True:
-            print("Invalid SUP1 console ip\n")
+            if debug == 1:
+                print("%s: Invalid SUP1 console ip"%(name))
             return None
         dItem["SUP1"] = sup1
 
@@ -79,7 +81,7 @@ class CQaBrdsInfo(object):
             if debug == 1:
                 print("IP2:", resSup2.group(1), end=' ')
                 print("port2:", resSup2.group(2))
-            sup2 = resSup2.group(1) + " " + resSup2.group(2)
+            sup2 = resSup2.group(1) + " 20" + resSup2.group(2)
             reExp = re.compile(r'(\d+)\.(\d+)\.(\d+)\.(\d+)')
             reVal = (reExp.search(sup2) is  None)
             if reVal == True:
@@ -119,8 +121,9 @@ class CQaBrdsInfo(object):
         # create a dict
         # to find sub cards info, just for EOR
         dSubCards = self.getEorCardsInfo(name, dDataBase)
-        print("=====Name:", name)
-        print(dSubCards)
+        if debug == 1:
+            print("=====Name:", name)
+            print(dSubCards)
         # append SUB cards
         dItem.update({'SUB':dSubCards})
         dEORInfo[name] = dItem
@@ -131,15 +134,17 @@ class CQaBrdsInfo(object):
     : read system info file to get the information of chassises
     : Name: {sup: "ip port", sup2: ip, apc: ...., psu:... }
     '''
-    def ParserFile(self, filePath):
+    def getBrdsFromFile(self, filePath):
         debug = self.debug
         fileHandle = open(filePath, 'rb')
 
+        dChassInfo = dict()
+        if debug == 1:
+            print("@@@@@!!!!!!!!!!!!!!!!!!!!!!!!@@@@@@@", filePath)
         try:
             lineNum = 0
             started = 0
             strEOR = ''
-            dChassInfo = dict()
             for line in fileHandle.readlines():
                 lineNum = lineNum + 1
                 # Fixed error:can't use a string pattern on a bytes-like object
@@ -156,7 +161,8 @@ class CQaBrdsInfo(object):
 
                 result = re.search(r'^}', line)
                 if result:
-                    print("=== stop parser!!!!")
+                    if debug == 1:
+                        print("=== stop parser!!!!")
                     started = 0
                     break
 
@@ -182,59 +188,79 @@ class CQaBrdsInfo(object):
                         if debug == 1:
                             print("######################\n", dEORItem)
                     strEOR = ''
-            self.printChassisInfo(dChassInfo)
-            self.dBrdsInfo = dChassInfo
-            return dChassInfo
+            #self.printChassisInfo(dChassInfo)
+            self.dBrdsInfo.update(dChassInfo)
         finally:
             fileHandle.close()
+        return dChassInfo
 
-    def findKeys(self, dBrdInfo, brd, keys):
-        ret = ""
-        if brd in dBrdInfo.keys():
-            dInfo = dBrdInfo[brd]
-            if keys in dInfo.keys():
-                ret = dInfo[keys]
+    def findKeys(self, brdlst, keys, dBrdInfo):
+        if dBrdInfo is None:
+            dBrdInfo = self.dBrdsInfo
+
+        dRet = {}
+
+        for brd in brdlst:
+            if brd in dBrdInfo.keys():
+                dInfo = dBrdInfo[brd]
+                if keys in dInfo.keys():
+                    ret = dInfo[keys]
+                    dRet.update({brd:ret})
+                else:
+                    print("Invalid key string:", keys)
             else:
-                print("Invalid key string:", keys)
-        else:
-            print("Invalid board name :", brd)
-        return ret
+                print("Invalid board name :", brd)
+        print(dRet)
+        return dRet
 
-    def findAPC(self, dBrdsInfo, brd):
-        return self.findKeys(dBrdsInfo, brd, "APC")
+    def findAPC(self, brdlst, dBrdsInfo=None):
+        return self.findKeys(brdlst, "APC", dBrdsInfo)
 
-    def findPSU(self, dBrdsInfo, brd):
-        return self.findKeys(dBrdsInfo, brd, "PSU")
+    def findPSU(self, brdlst, dBrdsInfo=None):
+        return self.findKeys(brdlst, "PSU", dBrdsInfo)
 
-    def findSUP1(self, dBrdsInfo, brd):
-        return self.findKeys(dBrdsInfo, brd, "SUP1")
+    def findSUP1(self, brdlst, dBrdsInfo=None):
+        return self.findKeys(brdlst, "SUP1", dBrdsInfo)
 
-    def findSUP2(self, dBrdsInfo, brd):
-        return self.findKeys(dBrdsInfo, brd, "SUP2")
+    def findSUP2(self, brdlst, dBrdsInfo=None):
+        return self.findKeys(brdlst, "SUP2", dBrdsInfo)
 
-    def findIP1(self, dBrdsInfo, brd):
-        return self.findKeys(dBrdsInfo, brd, "IP1")
+    def findIP1(self, brdlst, dBrdsInfo=None):
+        return self.findKeys(brdlst, "IP1", dBrdsInfo,)
 
-    def findIP2(self, dBrdsInfo, brd):
-        return self.findKeys(dBrdsInfo, brd, "IP2")
+    def findIP2(self, brdlst, dBrdsInfo=None):
+        return self.findKeys(brdlst, "IP2", adBrdsInfo)
 
-    def findBrds4Type(self, dBrdsInfo, brd, cardType):
-        brdList = []
+    def findBrds4Type(self,  cardType, dBrdsInfo=None ):
+        if dBrdsInfo is None:
+            dBrdsInfo = self.dBrdsInfo
+
+        brdList = {}
         for brd, dInfo in dBrdsInfo.items():
             cdTypeStr = dInfo['CARD']
             if cmp(cdTypeStr.upper(), cardType.upper()) == 0:
-                brdList.append([brd, dInfo['SUP1']])
+                brdList.update({brd:dInfo['SUP1']})
         print("Board list:", brdList)
         return brdList
 
 
     def getEorCardsInfo(self, brd, dData):
-        dEor = {'sup':[], 'lc':[], 'fm':[], 'sc':[]}
-        grepCmd = 'egrep  \"^set(.*){([0-9]|\s)+}\" /home/ins-diag-qa/sys_cfg/' + brd + '/eor_screening_config_file.tcl.new'
-        print(grepCmd)
+        debug = self.debug
+        dEor = {'SUP':[], 'LC':[], 'FM':[], 'SC':[]}
+        strFile = '/home/ins-diag-qa/sys_cfg/' + brd + '/eor_screening_config_file.tcl.new'
+        bExist = os.path.exists(strFile)
+        if bExist == False:
+            if debug == 1:
+                print("%s ! Not exist!".format(strFile))
+            return dEor
+        #grepCmd = 'egrep  \"^set(.*){([0-9]|\s)+}\" /home/ins-diag-qa/sys_cfg/' + brd + '/eor_screening_config_file.tcl.new'
+        grepCmd = 'egrep  \"^set(.*){([0-9]|\s)+}\" ' + strFile
+        if debug == 1:
+            print(grepCmd)
         matchLst = os.popen(grepCmd).readlines()
         for itm in matchLst:
-            print(itm)
+            if debug == 1:
+                print(itm)
             match = re.search(r'([A-Z]+)_list {([\d|\s]+)}', itm)
             if match:
                 brdtype = match.group(1)
@@ -244,25 +270,29 @@ class CQaBrdsInfo(object):
                     brdtype = match.group(1)
                 else:
                     continue
-            print("=====:", brdtype)
+            if debug == 1:
+                print("=====:", brdtype)
             for k, l in dData.items():
-
                 if brdtype in l:
                     dEor[k].append({brdtype:match.group(2)})
-        print(dEor)
+        if debug == 1:
+            print(dEor)
         return dEor
 
 
     def findCardType(self, brd, dData):
+        debug = self.debug
         cdType = "TOR"
         for k, l in dData.items():
             if brd in l:
                 cdType = k
                 break
-        print("{} : {}".format(brd, cdType))
+        if debug == 1:
+            print("{} : {}".format(brd, cdType))
         return cdType
 
     def searchBoards(self, brdLst, dInfo, dDataBase):
+        debug = self.debug
         dMatchedCards = {}
         for key, val in dInfo.items():
             bfind = 0
@@ -276,7 +306,8 @@ class CQaBrdsInfo(object):
                         break
                 else:
                     lCard = val['SUB'][bType]
-                    print("=======", lCard)
+                    if debug == 1:
+                        print("=======", lCard)
                     bGet = 0
                     for ditm in lCard:
                         if brd in ditm.keys():
@@ -293,24 +324,34 @@ class CQaBrdsInfo(object):
         self.printSearch(brdLst, dMatchedCards)
         return dMatchedCards
 
-
     def printSearch(self, brdLst, dSearchResult):
         print("Search boards:{}".format(" ".join(brdLst)))
         print("============================================")
+        self.printCards(dSearchResult)
+
+    def printCards(self, dSearchResult=None):
+        if dSearchResult is None:
+            print("====================All Data===================")
+            dData = self.dBrdsInfo
+            print(dData)
+        else:
+            dData = dSearchResult
+
         idx = 0
-        for key, val in dSearchResult.items():
+        for key, val in dData.items():
             idx = idx +1
-            strHeader = "[%03d] %-10s: "%(idx, key)
+            strHeader = "[%03d] %-10s"%(idx, key)
             if val['CARD'] == "":
                 brdType = "EOR"
                 dInfo = val['SUB']
                 if val['SUP2'] == "":
                     sInfo = ""
                 else:
-                    sInfo = "\n\t\tCON2:[{}] ".format(val['SUP2'])
+                    sInfo = "\n\t\t    CON2:[{}] ".format(val['SUP2'])
 
+                sInfo = sInfo + "\n\t\t" + "SUB CARDS: "
                 for key1, vallst in dInfo.items():
-                    sInfo = sInfo + "\n\t\t" + key1 + ": "
+                    sInfo = sInfo + "\n\t\t    " + key1 + ": "
                     for dVal in vallst:
                         for key2, val2 in dVal.items():
                             sInfo = sInfo + key2 + "[" + val2 + "] "
@@ -319,11 +360,8 @@ class CQaBrdsInfo(object):
                 sInfo = " "
 
             sSup1 = " CON1:[{}] ".format(val['SUP1'])
-            print("{} ==={} {} {}".format(strHeader, brdType, sSup1, sInfo))
+            print("{} [{}]: {} {}".format(strHeader, brdType, sSup1, sInfo))
         return
-
-
-
 
 
 #########################################################
@@ -344,26 +382,27 @@ strEorSys = "/home/ins-diag-qa/sys_cfg/"
 g_src = strTestFile
 
 g_dEorCards = {
-    'fm':['MTBK', 'MMTH', 'MTBY', 'MTEVT', 'MTKT', 'MOUN', 'SHWN'],
-    'sc':['ALTA'],
-    'sup':['KIRK', 'KSTN', 'ZION'],
-    'lc':['ABVL','APCH','ARHD','BLAC','BLMT','BLWD','CHCP','CPCK','CSCD',
+    'SC':['ALTA'],
+    'SUP':['KIRK', 'KSTN', 'ZION'],
+    'FM':['MTBK', 'MMTH', 'MTBY', 'MTEVT', 'MTKT', 'MOUN', 'SHWN'],
+    'LC':['ABVL','APCH','ARHD','BLAC','BLMT','BLWD','CHCP','CPCK','CSCD',
           'CYNS','CYPR','HONE','load_lc', 'MOEN','MONT','RDLK','RDWD','SEYM',
           'SGLF','SHAS','SIER','SNBDII','SUNR','SVCK','TCMA','WHSL']
 }
 
 if __name__ == '__main__':
-    cInfo = CQaBrdsInfo(g_src, g_dEorCards, 1)
-#    tor = cInfo.ParserFile(g_src)
+    cInfo = CQaBrdsInfo(g_src, g_dEorCards, 0)
+    tor = cInfo.getBrdsFromFile(g_src)
 #    cInfo.printChassisInfo(tor)
     g_src = strEorFile
-    eor = cInfo.ParserFile(g_src)
+    eor = cInfo.getBrdsFromFile(g_src)
     brdl = ['RDLK']
     cInfo.searchBoards(brdl, eor, g_dEorCards)
     #cInfo.printChassisInfo(eor)
-    cInfo.printChassisInfo(tor)
+    #cInfo.printChassisInfo(tor)
     cInfo.getEorCardsInfo("COR4_32", g_dEorCards)
-
+    print("================================================")
+    cInfo.printCards(None)
 
 
 
