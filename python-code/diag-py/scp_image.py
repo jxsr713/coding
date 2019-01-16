@@ -17,13 +17,13 @@ def scp_file(ip, fileName, dst):
     print("cmd::", cmd)
     # 注意在events中的后面那个回车符\n
     (command_output, exitstatus) = run(cmd, events={'password': pwd + '\n'},
-                                       withexitstatus=1)
+                                       withexitstatus=1, timeout=200)
     # command_output = run(cmd, events={"[pP]assword": pwd+'\n'})
     print(command_output)
     if exitstatus == 0:
         print("successfully copy file:%s to %s"%(fileName, ip))
     else:
-        print("timeout")
+        print("timeout", exitstatus)
 
     return exitstatus == 0
 

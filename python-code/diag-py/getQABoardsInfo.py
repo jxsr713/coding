@@ -1,8 +1,9 @@
-#!/usr/bin/python3.3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import re
 import os
+import operator
 
 class CQaBrdsInfo(object):
     def __init__(self, infofile, dCardData, debug=0):
@@ -10,13 +11,13 @@ class CQaBrdsInfo(object):
         self.dBrdsInfo={}
         self.dCardDataBase=dCardData
         self.debug = debug
-        self.json = "qa.json"
+        self.json = "/home/weihozha/self-code/coding/python-code/diag-py/qa.json"
         return
 
     def setJson(self, fJson=""):
         self.json = fJson
         if fJson == "":
-            self.json = "qa.json"
+            self.json = "/home/weihozha/self-code/coding/python-code/diag-py/qa.json"
         return
 
     def printChassisInfo(self, dChassis):
@@ -144,7 +145,13 @@ class CQaBrdsInfo(object):
             print("{} not exist!!".format(filePath))
             return -1
         with open(filePath, 'r') as f:
-            dData = json.load(f)
+            try:
+                dData = json.load(f)
+            except ValueError:
+                print('Failed to read %s '%(filePath))
+                return -1
+
+
         self.dBrdsInfo=dData
 
         return 0
@@ -256,21 +263,35 @@ class CQaBrdsInfo(object):
         return self.findKeys(brdlst, "IP1", dBrdsInfo,)
 
     def findIP2(self, brdlst, dBrdsInfo=None):
-        return self.findKeys(brdlst, "IP2", adBrdsInfo)
+        return self.findKeys(brdlst, "IP2", dBrdsInfo)
 
-    def findBrds4Type(self,  cardType, dBrdsInfo=None ):
+    # search boards with same TYPE
+    def findTorBrds4Type(self,  cardType, dBrdsInfo=None ):
         if dBrdsInfo is None:
             dBrdsInfo = self.dBrdsInfo
 
         brdList = {}
+        print(cardType)
         for brd, dInfo in dBrdsInfo.items():
+            #print(brd, dInfo, cardType)
             cdTypeStr = dInfo['CARD']
-            if cmp(cdTypeStr.upper(), cardType.upper()) == 0:
-                brdList.update({brd:dInfo['SUP1']})
+            if not cdTypeStr:
+                continue
+
+            if cdTypeStr in cardType:
+                if cdTypeStr in brdList.keys():
+                    lstVal = brdList[cdTypeStr]
+                else:
+                    lstVal = []
+                lstVal.append(brd)
+                brdList.update({cdTypeStr:lstVal})
+
         print("Board list:", brdList)
         return brdList
 
-
+    #############################################
+    # Get EOR Sub cards from qa folder
+    #
     def getEorCardsInfo(self, brd, dData):
         debug = self.debug
         dEor = {'SUP':[], 'LC':[], 'FM':[], 'SC':[]}
@@ -318,38 +339,68 @@ class CQaBrdsInfo(object):
             print("{} : {}".format(brd, cdType))
         return cdType
 
-    def searchBoards(self, brdLst, dInfo, dDataBase):
+    def searchBoards(self, brdLst, dInfo = None,  bAnd = False):
+        global g_dEorCards
+        dCardType = g_dEorCards
+        if dInfo is None:
+            dInfo = self.dBrdsInfo
+
         debug = self.debug
         dMatchedCards = {}
         for key, val in dInfo.items():
-            bfind = 0
+            bTorFind = 0
+            bEorFind = 0
+            #print("#####################################")
             for brd in brdLst:
-                bType = self.findCardType(brd, dDataBase)
+                if debug == 1:
+                    print("-------%s------", brd)
+                bType = self.findCardType(brd, dCardType)
                 if bType == "TOR":
                     card = val['CARD']
-                    if cmp(card, brd) == 0:
-                        bfind = 1
-                        dMatchedCards.update({key:val})
+                    if operator.eq(card, brd):
+                        bTorFind = 1
                         break
                 else:
+                    bEorFind = 1
+
                     lCard = val['SUB'][bType]
                     if debug == 1:
                         print("=======", lCard)
                     bGet = 0
                     for ditm in lCard:
+                        if debug == 1:
+                            print("------", ditm.keys())
                         if brd in ditm.keys():
                             bGet = 1
+                            if debug == 1:
+                                print(key, "!!!", brd, "===", ditm)
                             break
-                    if bGet == 1:
-                        bfind = 1
+                    bEorFind = bEorFind & bGet
+                    if debug == 1:
+                        print("!!!!!!!!!!!!", bEorFind, "===", bGet, "----------------", bAnd)
+                    if bAnd:
+                        # for and is true, if one board does not matched
+                        # then skip the boards
+                        if not bEorFind:
+                            if debug == 1:
+                                print(key, "!--SKIPPPPPPPPP-----!!", brd, "===", ditm)
+                            break
                     else:
-                        if bfind == 1:
-                            bfind = 0
+                        # for And is false
+                        # only match one board
+                        if bEorFind == 1:
                             break
-            if bfind == 1:
+
+            if bTorFind | bEorFind:
+            #if bEorFind:
                 dMatchedCards.update({key:val})
+        print("================================================================")
         self.printSearch(brdLst, dMatchedCards)
         return dMatchedCards
+
+    def searchTors(self, brdLst, bAnd = False):
+        dBrdsInfo = self.dBrdsInfo
+        self.searchBoards(brdLst, dBrdsInfo, bAnd )
 
     def printSearch(self, brdLst, dSearchResult):
         print("Search boards:{}".format(" ".join(brdLst)))
@@ -374,7 +425,7 @@ class CQaBrdsInfo(object):
                 if val['SUP2'] == "":
                     sInfo = ""
                 else:
-                    sInfo = "\n\t\t    CON2:[{}] ".format(val['SUP2'])
+                    sInfo = "\n\t\t\tCON2:[{}] ".format(val['SUP2'])
 
                 sInfo = sInfo + "\n\t\t" + "SUB CARDS: "
                 for key1, vallst in dInfo.items():
@@ -386,7 +437,7 @@ class CQaBrdsInfo(object):
                 brdType = "TOR:{}".format(val['CARD'])
                 sInfo = " "
 
-            sSup1 = " CON1:[{}] ".format(val['SUP1'])
+            sSup1 = "CON1:[{}] ".format(val['SUP1'])
             print("{} [{}]: {} {}".format(strHeader, brdType, sSup1, sInfo))
         return
 
@@ -424,13 +475,20 @@ if __name__ == '__main__':
 #    cInfo.printChassisInfo(tor)
     g_src = strEorFile
     eor = cInfo.getBrdsFromFile(g_src)
-    brdl = ['RDLK']
-    cInfo.searchBoards(brdl, eor, g_dEorCards)
+    brdl = ['RDLK', "ZION"]
+    cInfo.searchTors(brdl)
+    #cInfo.searchBoards(brdl, eor, g_dEorCards )
+    print("================================================")
+    print("================================================")
+    brdl = ['FOSTERS', "PARIS"]
+    cInfo.searchTors(brdl)
+    #cInfo.searchBoards(brdl, tor, g_dEorCards)
+    print("================================================")
     #cInfo.printChassisInfo(eor)
     #cInfo.printChassisInfo(tor)
     cInfo.getEorCardsInfo("COR4_32", g_dEorCards)
     print("================================================")
-    cInfo.printCards(None)
+    #cInfo.printCards(None)
 
 
 

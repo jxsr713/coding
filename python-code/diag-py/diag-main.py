@@ -1,4 +1,4 @@
-#!/usr/bin/python3.3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import re
@@ -7,8 +7,10 @@ import argparse
 import getopt
 import sys
 
-#######################################################################
+###############################################################
 # define function
+###############################################################
+#### short_func: long func, description
 g_dParaKeys = {"f":["func=", "function"],
                "b":["brd=", "board list"],
                "s":["src=", "source file"],
@@ -19,20 +21,6 @@ g_dParaKeys = {"f":["func=", "function"],
                }
 
 g_funcType = -1
-
-g_funcLst = ['backup',
-             'ssd_info', 'scp_brd', 'telnet', 'ssh', #use pexpect function
-             'get_ip', 'get_con', 'get_brds', #data from sys_info.tcl
-             'pro_brd', 'pro_sch', 'pro_save', 'pro_hdr', 'pro_all' , #data from product web
-             'update_csv'                   #update csv files
-             ]
-
-g_funcHelp = ['Save data to json file', 'Show ssd information', 'scp file to a brd',
-              'telnet board', 'login board through ssh'
-              'Get IP address', "Get console info", "List same type boards",
-              "Search product information", "get some info", "save pro info", "print header", "print brds",
-              "update csv file from web/tcl"
-              ]
 
 
 g_dataSrc = 0
@@ -46,48 +34,52 @@ g_dst=""
 
 
 
-def usage():
+def usage(opt=None):
     """
     The output  configuration file contents.
-    Usage: xxxxx.py [-f|--func,[get .....]] [-b|--board,[string]] [-k|--key [keys list] [-h|--help] [-v|--version]
-
-    Description
-        -f,--func functions
-        -c,--column header string
-        -k,--key search string
-        -h,--help    Display help information.
-        -v,--version  Display version number.
-        for example:
-            python config.py -d 13
-            python config.py -c allow
-            python config.py -h
-            python config.py -d 13 -c allow
+    Usage: xxxxx.py [-f|--func,[get .....]] [-b|--board,[string]] [-k|--key [keys list] [-h|--telp] [-v|--version]
     """
-    print("{}     {}".format(paraKeys, paraLst))
-    print(g_funcLst)
-    print(g_funcHelp)
+
+    global g_funcType, g_funcLst, g_funcHelp, paraKeys, paraLst
+    print("=== option list ==")
+    for pkey, plist in g_dParaKeys.items():
+        longName = plist[0].replace("=", "")
+        print("    -%s|--%-5s: [%s] "%(pkey, longName, plist[1]))
+
+    print("================ function list =================")
+    for key, itm in g_funcLst.items():
+        print("\t%-10s: %s"%(key, itm[0]))
+
 
 ##########################################################################
 def parserOpt():
     global g_funcType, g_funcLst, g_funcHelp, paraKeys, paraLst
     global g_brdLst, g_src, g_dst
 
-    paraKeys = ""
-    paraLst = []
+    shortKeys = ""
+    longOptLst = []
     idx = 0
     for pkey, plist in g_dParaKeys.items():
+        longName = plist[0]
+        # if the option have variable, need add ":"
+        syb = ""
+        if longName.find("=") != -1:
+            syb = ":"
+
         if idx == 0:
             idx = 1
-            paraKeys = pkey
+            shortKeys = pkey + syb
         else:
-            paraKeys = paraKeys + ":" + pkey
-        paraLst.append(plist[0])
 
-    print("{}  {}\n".format(paraKeys, paraLst))
+            shortKeys = shortKeys + pkey + syb
+
+        longOptLst.append(plist[0])
+
+    #print("{}  {}\n".format(shortKeys, longOptLst))
     try:
-        options,args = getopt.getopt(sys.argv[1:], paraKeys, paraLst)
+        options,args = getopt.getopt(sys.argv[1:], shortKeys, longOptLst)
     except getopt.GetoptError as err:
-        print(str(err))
+        print("[ERROR]!!!!!!!!! ", str(err))
         print(usage.__doc__)
         usage()
         sys.exit(1)
@@ -105,9 +97,10 @@ def parserOpt():
             exit(0)
         elif opt in ("-f", "--func"):
             print("Get ==:", a)
-            if a in g_funcLst:
-                g_funcType = g_funcLst.index(a)
+            if a in g_funcLst.keys():
+                g_funcType = a
             else:
+                g_funcType = 'help'
                 print("invalid function!!!", a)
         elif opt in ("-b", "--board"):
             g_brdLst.append(a)
@@ -135,18 +128,35 @@ def do_qa_func(func):
         dTorList = cInfo.getBrdsFromFile(qa.strTorFile)
         dEorList = cInfo.getBrdsFromFile(qa.strEorFile)
     if func == 0:
-        cInfo.saveDataToJson("qa.json")
+        fileName = "/home/weihozha/self-code/coding/python-code/diag-py/qa.json"
+        cInfo.saveDataToJson(fileName)
+        print("Save qa info to %s"%(fileName))
     elif func == 1:   # get ip
+        print("Unsupport !!!!!!")
         return
     elif func == 2:   # get console
         dSup1 = cInfo.findSUP1(g_brdLst)
         dSup2 = cInfo.findSUP2(g_brdLst)
         dRet.update({"SUP1":dSup1})
         dRet.update({"SUP2":dSup2})
-        #print(dRet)
-    elif func == 3:   # get brds
-        dSup1 = cInfo.findBrds4Type(g_keysLst)
-        dRet.update({"CARD":dSup1})
+        lst = list(dSup1.items()) + list(dSup2.items())
+        print("====Get console =====")
+        for brd in g_brdLst:
+            itm1 = dSup1[brd]
+            itm2 = dSup2[brd]
+            if itm1:
+                strRet = "%-10s: CON1 [%s]"%(brd, itm1)
+            if itm2:
+                strRet = "%s: CON2 [%s]"%(strRet, itm2)
+            print(strRet)
+
+    elif func == 3:   # get TOR brds
+        dBrds = cInfo.searchBoards(g_keysLst)
+        #dBrds = cInfo.findTorBrds4Type(g_keysLst)
+
+    elif func == 4:   # get EOR brds
+        #dBrds = cInfo.findEorBrds4Type(g_keysLst)
+        dBrds = cInfo.searchBoards(g_keysLst, None, True)
     else:
         print("Wrong para!")
 
@@ -166,7 +176,7 @@ def do_prod_func(func):
     cInfo.readAllBrdsInfo()
     if func == 0:
         print("unsupport the func")
-    elif func == 1:   # get board information
+    elif func == 1:   # get board all information
         dSearch = cInfo.SearchItem(g_keysLst, 0)
         cInfo.printSearch(dSearch)
     elif func == 2:   # get board some information
@@ -191,13 +201,16 @@ def do_pexpect_func(func):
         pt.scp_func(g_brdLst, g_src, g_dst)
     elif func == 3:   # login telnet
         dSup = do_qa_func(2)
+        print(dSup)
         dSup1 = dSup['SUP1']
         brdLst = []
         for brd in g_brdLst:
             con = dSup1[brd]
             brdLst.append(con)
+        print(brdLst)
         pt.login_brd_func(brdLst, 1)
     elif func == 4:   # ssh
+        print(g_brdLst)
         pt.login_brd_func(g_brdLst, 0)
     return
 
@@ -220,12 +233,68 @@ def do_r_w_json(fileSrc, strrw, dData):
             json.dump(dData, f)
     return 1
 
+
+#####################################################
+# func_key:["description", func_handler, func_para, check para]
+#####################################################
+g_funcLst = {'backup': ['Save data to json file', do_qa_func, 0, ''],
+             'help': ['print command usages', usage, 0, ''],
+             'ssd_info': ['Show ssd information', do_pexpect_func, 1, 'b'],
+             'scp_brd': ['scp file to a brd', do_pexpect_func, 2, 'sbd'],
+             'telnet': ['telnet board', do_pexpect_func, 3, 'b'],
+             'ssh': ['ssh board', do_pexpect_func, 4 , 'b'],                   #use pexpect function
+             'get_ip': ['Get IP address', do_qa_func, 1, 'b'],
+             'get_con': ['Get console info', do_qa_func, 2, 'b'],
+             'get_tors': ['List all tor boards with same type boards', do_qa_func, 3, 'k'],       #data from sys_info.tcl
+             'get_eors': ['List all EORs with same type boards', do_qa_func, 4, 'k'],       #data from sys_info.tcl
+             'pro_brd': ['Search product information according key <hdrname:keys>', do_prod_func, 1, 'k'],
+             'pro_sch': ['get product some info specified by -k',do_prod_func, 2, 'k'],
+             'pro_save': ['save product table info to cvs file', do_prod_func, 3, ''],
+             'pro_hdr': ['print product table header', do_prod_func, 5, ''],
+             'pro_all': ['print all brds',do_prod_func, 4 , ''], #data from product web
+             'update_csv': ['update csv file from web/tcl', '',0, '']                   #update csv files
+             }
+
+
+def check_paras(strParas):
+    global g_brdLst, g_src, g_dst, g_keysLst
+    error = 0
+    for ch in strParas:
+        if ch == 'b': #board list
+            if not g_brdLst:
+                error = 1
+                print("Please input board list: -b <brd>")
+        elif ch == 'k':
+            if not g_keysLst:
+                error = 1
+                print("Please input keys list: -k <keys>")
+        elif ch == 's':
+            if not g_src:
+                error = 1
+                print("Please input source file: -s <file>")
+        elif ch == 'd':
+            if not g_src:
+                error = 1
+                print("Please input destination file: -d <file>")
+    return error
+
 ################################################
 if __name__ == '__main__':
     parserOpt()
     print("Func:", g_funcType)
 
-    if g_funcType == 0:  # backup data
+    funcLst = g_funcLst[g_funcType]
+
+    funcHdl = funcLst[1]
+    funcNum = funcLst[2]
+    chkLst = funcLst[3]
+    print("%s  with %d"%(g_funcType, funcNum))
+    if check_paras(chkLst):
+        exit(0)
+    funcHdl(funcNum)
+
+    exit(0)
+    if g_funcType == None:  # backup data
         #do_prod_func(0)
         do_qa_func(0)
     elif g_funcType <= 4:   # pexpect function

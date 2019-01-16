@@ -63,25 +63,27 @@ def run_cmd(child, cmd, expect):
 ####################################################################
 def telnet_or_ssh_login(conType, ipAddress, loginName, loginPassword, debug):
     lstexpect = []
+    debug = 0
     login = 0
     # 提示符，可能是’ $ ’ , ‘ # ’或’ > ’ 和 dsh下的[xx]
 
-    loginprompt = '[[\d]]|[\~\]\#]'
-    if conType != 1:    # ssh
-        loginprompt = '~]#'
+    #loginprompt = '([\[\d\]]|[\~\]\#])'
+    loginprompt = '\[\d+\]|(\~\]\#)'
+    #if conType != 1:    # ssh
+    #    loginprompt = '~]#'
 
-    lstexpect.append("login")           # index 0
+    lstexpect.append("insdiag login:")           # index 0
     lstexpect.append("[pP]assword")     # index 1
     lstexpect.append("(?i)Unknown host")    # index 2
     lstexpect.append(loginprompt)
     lstexpect.append("refused")
+    lstexpect.append("loader >")
     lstexpect.append(pexpect.EOF)
     lstexpect.append(pexpect.TIMEOUT)
     # 拼凑 telnet 命令
     if conType == 1:    # telnet
         cmd = 'telnet ' + ipAddress
     else:               # ssh
-        loginprompt = '~]#'
         cmd = 'ssh ' + loginName + '@' + ipAddress
     if(debug == 1):
         print("Cmd:", cmd)
@@ -104,17 +106,17 @@ def telnet_or_ssh_login(conType, ipAddress, loginName, loginPassword, debug):
             # 匹配'login'字符串成功，输入用户名.
             if(debug == 1):
                 print("Match login")
-            # child.sendline(loginName)
+            child.sendline(loginName)
         elif(index == 1):
             # 期待 "[pP]assword" 出现.
             # 匹配 "[pP]assword" 字符串成功，输入密码.
             child.sendline(loginPassword)
-        elif(index == 3):
+        elif(index == 3 or index == 5):
             login = 1
             break
             # 期待提示符出现.
             # child.expect(loginprompt)
-        elif index == 4 or index == 3:
+        elif index == 4 :
             if(debug == 1):
                 print("Connection refused!\n")
             break
@@ -352,8 +354,9 @@ def get_ssd_func(child, dictRtn, ipAddr):
     debug = 0
     # Get information of boards
     cmd = "echo TP=$INS_CARD_TYPE NUM=$INS_PRODUCT_NUM"
-    invprot = ']#'
+    invprot = '\[\d+\]|(\~\]\#)'
     child.sendline(cmd)
+    child.buffer = ""
     index = child.expect([invprot, pexpect.EOF, pexpect.TIMEOUT])
     if(index == 0):
         strBuff = child.before
@@ -363,8 +366,8 @@ def get_ssd_func(child, dictRtn, ipAddr):
         matched = pattern.search(strBuff)
         board = matched.group(1) if(matched) else ""
         #    board = matched.group(1)
-        if debug == 1:
-            print("board {} {}".format(board, matched.group(1)))
+        #if debug == 1:
+        #    print("board {} {}".format(board, matched.group(1)))
 
         pattern = re.compile(r"NUM=([\w|-]+)")
         matched = pattern.search(strBuff)
@@ -380,20 +383,18 @@ def get_ssd_func(child, dictRtn, ipAddr):
     index = child.expect([loginprompt, pexpect.EOF, pexpect.TIMEOUT])
     size = 0
     snstr = ""
+    if debug == 1:
+        print("Get index:%d"%(index))
     if(index == 0):
         strBuff = child.before
+        if debug == 1:
+            print(strBuff)
         pattern = re.compile(r"User Capacity:.* \[(\d+)")
         matched = pattern.search(strBuff)
         size = matched.group(1) if(matched) else 0
-        #    size = matched.group(1)
-        # else:
-        #    return
         pattern = re.compile(r"Device Model:\s+([\w|-]+)")
         matched = pattern.search(strBuff)
         snstr = matched.group(1) if(matched) else ""
-        #    snstr = matched.group(1)
-        # else:
-        #     return
     flag = ""
     if size != 0:
         if(snstr.find(size) == -1):
@@ -880,7 +881,8 @@ def login_func(child, para1, ipAddr):
     print("=========login {}==========".format(ipAddr))
     cmd = "echo TP=$INS_CARD_TYPE NUM=$INS_PRODUCT_NUM"
     cmd = "pwd"
-    invprot = '[[\d]]|[\~\]\#]'
+    invprot = '\[\d+\]|(\~\]\#)'
+    #invprot = '[[\d]]|[\~\]\#]'
     child.sendline(cmd)
     index = child.expect([invprot, pexpect.EOF, pexpect.TIMEOUT])
     if(index == 0):
@@ -888,7 +890,7 @@ def login_func(child, para1, ipAddr):
         # print(strBuff+child.after)
     child.sendline()
     child.interact()
-    print("\n======8-8======")
+    print("======8-8======")
     return
 
 def login_brd_func(brdlst, conType):

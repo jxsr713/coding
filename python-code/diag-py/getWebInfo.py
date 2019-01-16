@@ -201,85 +201,84 @@ class CProductInfo(object):
         lsthdr = self.header["HEADER"]
         brds = self.boards
 
-        for brd in brds:
-            bfind = 1
-            val = brds[brd]
-            valList = []
-            # search header value
-            for keys in keyLst:
-                # parser keys (header:cmpkeys)
-                header = ""
+        # check header and keys
+        dKeys = {}
+        # format: <header>:<match str>
+        for keys in keyLst:
+            pos = keys.find(":")
+            if pos == -1:   # only header no match string
+                header = keys
                 cmpkey = ""
-                pos = keys.find(":") #spltChar)
-                if pos == -1:
-                    header = keys
-                elif pos == 0:
-                    print("Invalid keys:", keys)
-                    continue
-                else:
-                    header = keys[:pos]
-                    cmpkey=keys[pos+1:]
-                # find the index of header
-                # '~': support not match operate
-                # if cmpkey[0] = ~, run not opt
-                bNot = 0
+            elif pos == 0:  # :<str> invalid
+                print("Invalid keys:", keys)
+                print("Skip the key", keys)
+                continue
+            else:           # <header>:<str>
+                header = keys[:pos]
+                cmpkey=keys[pos+1:]
+
+            bNot = 0
+            if cmpkey:
                 if cmpkey[0] == '~':
                     bNot = 1
                     cmpkey = cmpkey[1:]
 
-                if header not in lsthdr:
-                    print("wrong column:", header)
-                    print(lsthdr)
-                    continue
+            if header not in lsthdr:
+                print("ERROR:::::::wrong column:", header)
+                continue
+            if header in dKeys.keys():
+                lst = dKeys[header]
+                lst.append( [cmpkey.strip(), bNot])
+            else:
+                lst = [[cmpkey.strip(), bNot]]
+
+            dKeys[header] = lst
 
 
-                idx = lsthdr.index(header)
-                #print("Header:{}   keys:{} {}".format(header, cmpkey, bNot))
-                #print("Get index:", idx)
-                # get the valude of header
-                itmstr = str(val[idx])
+        for brd in brds:
+            bfind = 0
+            val = brds[brd]
+            valList = []
+            # search header value
+            for key, itmLst in dKeys.items():
+                # parser keys (header:cmpkeys)
+                header = key
+                for lst in itmLst:
+                    cmpkey = lst[0]
+                    bNot = lst[1]
 
-                #print(brd)
-                #print(itmstr)
-                bMatched = 1
+                    idx = lsthdr.index(header)
+                    print("Header:{}   keys:{} {}".format(header, cmpkey, bNot))
+                    #print("Get index:", idx)
+                    # get the valude of header
+                    itmstr = str(val[idx])
 
-                if itmstr.upper().find(cmpkey.upper()) >= 0:
                     bMatched = 1
-                else:
-                    bMatched = 0
-                bfind = bMatched
-                if bNot == 1:
-                    if bMatched == 1:
-                        bfind = 0
+
+                    if itmstr.upper().find(cmpkey.upper()) >= 0:
+                        bMatched = 1
                     else:
-                        bfind = 1
+                        bMatched = 0
+                    bfind = bMatched
+                    if bNot == 1:
+                        if bMatched == 1:
+                            bfind = 0
+                        else:
+                            bfind = 1
 
 
-                #print("itmstr:{} Not:{} find:{}".format(itmstr, bNot, bfind))
+                    print("itmstr:{} Not:{} find:{}".format(itmstr, bNot, bfind))
+                    if bfind == 0:
+                        break
+
                 if bfind == 0:
                     break
-
                 valList.append(itmstr)
-                '''
-                    if rstOpt != 0:    # show boards some information
-                        #strval = [itmstr, val[0:]]
-                        #else:           # just show board's column information
-                        if rstOpt == 0: #save all header
-                            strval = [itmstr, val[0:]]
-                        else:
-                            strval = [val[0] , itmstr]
-                    itmlst.append(strval)
-                    '''
             if bfind == 1:
                 if rstOpt == 0:
                     dValue[brd] = val
                 else:
                     dValue[brd] = valList
-
-                #print("{} : {}".format(brd, dValue[brd]))
-        #dValue[keys] = itmlst
-        #self.printBoards(dValue)
-
         return dValue
 
     def writeAllBrds2Csv(self, cvsFile):
@@ -363,12 +362,14 @@ class CProductInfo(object):
     def printSearch(self, dList):
         brd_dict = dList
         lstSort = sorted(brd_dict.keys())
+        print("========show result===========")
+        cnt = 0
         for brd_itm in lstSort:
             val = brd_dict[brd_itm]
-            print("%-20s"%(brd_itm), end='')
+            cnt = cnt + 1
+            print("[%d] %-20s"%(cnt, brd_itm), end='')
             print("{}".format(val))
 
-            #print("")
         return
 
     def printHeader(self):
@@ -562,7 +563,7 @@ paraLst =["func=", "src=", "key=", "rst=", "help", "version"]
 
 g_dataSrc = 0
 g_dataFrom = ['csv', 'web']
-g_datafile = ["product_info.csv", r'http://172.31.236.9/html/webtools/prodinfotbl.htm']
+g_datafile = ["/home/weihozha/self-code/coding/python-code/diag-py/product_info.csv", r'http://172.31.236.9/html/webtools/prodinfotbl.htm']
 
 def parserOpt():
     global g_funcType, g_keyslst, g_funcLst, g_funcHelp, paraKeys, paraLst, g_dataSrc, g_datafile, g_dataFrom
