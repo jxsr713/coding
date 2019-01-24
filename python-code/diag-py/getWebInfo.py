@@ -563,7 +563,7 @@ paraLst =["func=", "src=", "key=", "rst=", "help", "version"]
 
 g_dataSrc = 0
 g_dataFrom = ['csv', 'web']
-g_datafile = ["/home/weihozha/self-code/coding/python-code/diag-py/product_info.csv", r'http://172.31.236.9/html/webtools/prodinfotbl.htm']
+g_datafile = ["./product_info.csv", r'http://172.31.236.9/html/webtools/prodinfotbl.htm']
 
 def parserOpt():
     global g_funcType, g_keyslst, g_funcLst, g_funcHelp, paraKeys, paraLst, g_dataSrc, g_datafile, g_dataFrom
@@ -639,6 +639,7 @@ if __name__ == "__main__":
         cInfo.printSearch(dSearch)
     elif g_funcType == 3:   # save data to csv file
         print("save information")
+        strCsv = "./product_info.csv"
         cInfo.writeAllBrds2Csv(strCsv)
     elif g_funcType == 4:   # print all boards
         cInfo.printAllBoards()
