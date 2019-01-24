@@ -882,15 +882,19 @@ def login_func(child, para1, ipAddr):
     cmd = "echo TP=$INS_CARD_TYPE NUM=$INS_PRODUCT_NUM"
     cmd = "pwd"
     invprot = '\[\d+\]|(\~\]\#)'
+    loadprot = 'loader >'
     #invprot = '[[\d]]|[\~\]\#]'
     child.sendline(cmd)
-    index = child.expect([invprot, pexpect.EOF, pexpect.TIMEOUT])
+    index = child.expect([invprot, loadprot, pexpect.EOF, pexpect.TIMEOUT])
     if(index == 0):
         strBuff = child.before
         # print(strBuff+child.after)
+    elif (index == 1):
+        print("Enter loader ......")
+
     child.sendline()
     child.interact()
-    print("======8-8======")
+    print("======8-8:{}======".format(ipAddr))
     return
 
 def login_brd_func(brdlst, conType):

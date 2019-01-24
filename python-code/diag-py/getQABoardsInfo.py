@@ -5,6 +5,10 @@ import re
 import os
 import operator
 
+
+####################################################################
+# get qa all information of boards runing regression
+# TORS: from
 class CQaBrdsInfo(object):
     def __init__(self, infofile, dCardData, debug=0):
         self.fileName = infofile
@@ -357,7 +361,12 @@ class CQaBrdsInfo(object):
                 bType = self.findCardType(brd, dCardType)
                 if bType == "TOR":
                     card = val['CARD']
+                    # match fullname
                     if operator.eq(card, brd):
+                        bTorFind = 1
+                        break
+                    # search shortname
+                    if key.startswith(brd):
                         bTorFind = 1
                         break
                 else:
