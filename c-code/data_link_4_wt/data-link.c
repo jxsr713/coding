@@ -232,7 +232,7 @@ int travel_test(void){
 static void * pthread_send(void *arg)
 {
 	data_list p;
-	int udelay = rand() % 3;
+	int udelay = rand() % 10;
 	
 	
 	
@@ -257,7 +257,7 @@ static void * pthread_send(void *arg)
 static void * pthread_save(void *arg)
 {
 	data_list p;
-	int udelay = rand() % 3;
+	int udelay = rand() % 10;
 	
 	
 	

