@@ -56,6 +56,7 @@ int main()
      * eflags寄存器的第21位，如果程序可以清楚/设置它，则说明CPU支持CPUID指令。否则不支持
      */
 
+		if(0) {
     /* 先取eflags */
     asm volatile ("pushf/n/t"
               "popl %%eax"
@@ -87,6 +88,7 @@ int main()
               :
               : "g"(eflags1)
               );
+		}
     /**
      * FIXME: Intel文档并没有说，如果不支持CPUID的话，clear/set eflags的第21位会有什么错误。
      * 它只说，在不支持CPUID指令的CPU上，如80386，执行CPUID会产生invalid opcode错误

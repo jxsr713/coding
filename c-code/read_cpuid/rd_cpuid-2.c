@@ -1,14 +1,13 @@
 #include <stdio.h>
-
 // intrinsics
 #if defined(__GNUC__)    // GCC
-#include <cpuid.h>
+		#include <cpuid.h>
 #elif defined(_MSC_VER)    // MSVC
-    #if _MSC_VER >=1400    // VC2005
-#include <intrin.h>
+		#if _MSC_VER >=1400    // VC2005
+				#include <intrin.h>
     #endif    // #if _MSC_VER >=1400
 #else
-#error Only supports MSVC or GCC.
+		#error Only supports MSVC or GCC.
 #endif    // #if defined(__GNUC__)
 
 void getcpuidex(unsigned int CPUInfo[4], unsigned int InfoType, unsigned int ECXValue)
@@ -42,6 +41,7 @@ void getcpuid(unsigned int CPUInfo[4], unsigned int InfoType)
 #if defined(__GNUC__)    // GCC
     __cpuid(InfoType, CPUInfo[0],CPUInfo[1],CPUInfo[2],CPUInfo[3]);
 #elif defined(_MSC_VER)    // MSVC
+		ssss
     #if _MSC_VER>=1400    // VC2005才支持__cpuid
         __cpuid((int*)(void*)CPUInfo, (int)InfoType);
     #else
