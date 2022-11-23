@@ -1,0 +1,83 @@
+#!/bin/bash
+
+############################# Functions #######################################
+#  usage
+usage() {
+  cat <<-EOF >&2
+  Generate patches ;
+    usage: ./${0##*/} -v 0 [-n numberl] [-t title] [m commits string]
+      -v  version information
+      -n  commit numbers
+      -m  patch source "6f2cde4f206f8f52a6d..45a0011b06a84c6f382f"
+      -c  commit ID;
+      -f  feature;
+      -r  sub-prefix;
+    example:
+      ./${0##*/} -m 0 -s ~/scan
+EOF
+  echo ""
+}
+
+if [ $# -eq 0 ]; then
+	usage
+	exit 0
+fi
+
+# check options
+version=0
+commits=0
+btwcmt=""
+repo="linux-drivers-review] [PATCH V"
+
+OPTIND=1
+while getopts :m:v:n:c:f:rh arg; do
+	case $arg in
+		v)
+			version="$OPTARG";;
+		n)
+			commits="$OPTARG";;
+		m)
+			btwcmt="$OPTARG";;
+		c)
+			cmtid="$OPTARG";;
+		r)
+			repo="${OPTARG}] [PATCH V";;
+		f)
+			feature="${OPTARG}";;
+		h)
+			usage;;
+		*)
+			echo "wrong parameter list"
+			exit 1
+			;;
+	esac
+done
+
+folder="patch-v${version}-${feature}"
+
+echo "Get version [${version}], commits:[${commits}] [${btwcmt}]"
+
+#repo="mce-test-review] [PATCH "
+
+
+if [ "${btwcmt}" == "" ]; then
+#bottom-top
+echo "mul ::: git format-patch --cover-letter --thread=shallow -M --subject-prefix=\"${repo}${version}\" -${commits} ${cmtid}"
+#files=$(git format-patch --cover-letter --thread=shallow -M --subject-prefix=\"${repo}${version}\" -${commits} ${cmtid}"
+files=$(git format-patch --cover-letter --thread=shallow -M --subject-prefix="${repo}${version}" -${commits} ${cmtid})
+else
+echo "git format-patch --cover-letter --thread=shallow -M --subject-prefix=\"${repo}${version}\" ${btwcmt}"
+files=$(git format-patch --cover-letter --thread=shallow -M --subject-prefix="${repo}${version}" ${btwcmt})
+fi
+#git format-patch --cover-letter --thread=shallow -M --subject-prefix="mce-test-review] [PATCH v1" 6f2cde4f206f8f52a6d..45a0011b06a84c6f382f
+
+# ${@:--1}, check $2 is -x exist, if no $2, :- will set -1 as default
+
+#files=$(git format-patch --cover-letter --thread=shallow -M --subject-prefix="${repo}${version}" "${@:--${commits}}")
+
+echo "files:$files"
+
+mkdir -p ./${folder}
+mv ${files} ./${folder}
+
+ls ./${folder} -l

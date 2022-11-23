@@ -1,0 +1,67 @@
+#!/bin/bash
+
+
+############################# Functions #######################################
+#  usage
+usage() {
+  cat <<-EOF >&2
+  Generate patches ;
+    usage: ./${0##*/} -v 0 [-n numberl] [-t title] [m commits string]
+      -v  version information
+      -n  commit numbers
+      -m  patch source "6f2cde4f206f8f52a6d..45a0011b06a84c6f382f"
+      -t  title information;
+    example:
+      ./${0##*/} -m 0 -s ~/scan
+EOF
+  echo ""
+}
+
+# check options
+version=0
+commits=0
+multcommit=""
+OPTIND=1
+while getopts :m:s:e arg; do
+	case $arg in
+		v)
+			version="$OPTARG";;
+		n)
+			commits="$OPTARG";;
+		m)
+			multcommit="$OPTARG";;
+		h)
+			usage;;
+		*)
+			echo "wrong parameter list"
+			exit 1
+			;;
+	esac
+done
+
+[[ $1 =~ ^v[1-9]* ]] && {
+	version="$1"
+	shift
+}
+
+[[ $1 =~ ^[1-9]* ]] && {
+	commits="$1"
+	shift
+}
+
+echo "Get version [${version}], commits:[${commits}]"
+
+#repo="mce-test-review] [PATCH "
+repo="linux-drivers-review] [PATCH "
+
+#if [ "$multcommit" == "" ]; then
+echo "git format-patch --cover-letter --thread=shallow -M --subject-prefix=\"${repo}${version}\" \"${@:--${commits}}\""
+#else
+#fi
+#git format-patch --cover-letter --thread=shallow -M --subject-prefix="mce-test-review] [PATCH v1" 6f2cde4f206f8f52a6d..45a0011b06a84c6f382f
+
+# ${@:--1}, check $2 is -x exist, if no $2, :- will set -1 as default
+
+#files=$(git format-patch --cover-letter --thread=shallow -M --subject-prefix="${repo}${version}" "${@:--${commits}}")
+
+echo "files:$files"
