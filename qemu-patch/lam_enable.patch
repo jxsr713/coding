@@ -17,7 +17,6 @@ QEMU strips address from the metadata bits and gets it to canonical
 shape before handling memory access. It has to be done very early before
 TLB lookup.
 
-Signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
 ---
  accel/tcg/cputlb.c                   | 20 +++++++++++++++++---
  include/hw/core/tcg-cpu-ops.h        |  5 +++++
